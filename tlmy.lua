@@ -1,14 +1,25 @@
--- tlmy.lua
---
+--[[
+  tlmy.lua
+  
+  Date: 27.07.2016
+  Author: wolfgang.kellerlwobilix.de
+]]--
 
--- dislay size
+----------------------------------------------------------------------
+-- Version String
+local version = " - v0.9" 
+
+----------------------------------------------------------------------
+-- dislay size for reciever
 local displayWidth = 212 
 local displayHeight = 64
 
--- screen number and table
+----------------------------------------------------------------------
+-- screen start number and table
 local screenNum = 1
 local screen = {}
 
+----------------------------------------------------------------------
 -- telemetry tables
 local telemetryName = {}
 local telemetryUnit = {}
@@ -16,11 +27,12 @@ local telemetryInfo = {}
 local telemetryData = {}
 local telemetrySound = {}
 
+----------------------------------------------------------------------
 -- model info
 local modelInfo = ""
 
 ----------------------------------------------------------------------
--- battery limits
+-- battery limits, can be changed on personal needs
 local cellNum = 3 -- adjustable via +/- in all screens
 local batterySound = {}
 local battery = { 
@@ -30,15 +42,15 @@ local battery = {
 	max = 4.3 }
 	
 ----------------------------------------------------------------------
--- rssi limits
+-- rssi limits, critical and ow vale are copied from radio
 local rssi = {
-  min = 35,
+  min = 50,
   critical = 42,
   low = 45,
   max = 105 }
 
 ----------------------------------------------------------------------
--- helper funtions
+-- helper funtion
 local function getTelemetryId(name)
    fieldInfo = getFieldInfo(name)
    if fieldInfo then
@@ -48,13 +60,14 @@ local function getTelemetryId(name)
 end
 
 ----------------------------------------------------------------------
--- utility funxtion
+-- mathematical utility function
 local function round(value, decimal)
   local exp = 10^(decimal or 0)
   return math.floor(value * exp + 0.5) / exp
 end
 
--- display parameter
+----------------------------------------------------------------------
+-- display value with name and unit
 local function displayValue(x, y, key, font)
   if telemetryInfo[key] ~= -1 then
     lcd.drawText(x, y, telemetryName[key] .. round(telemetryData[key], 2) .. telemetryUnit[key], font)
@@ -64,7 +77,7 @@ local function displayValue(x, y, key, font)
   end
 end
 
--- display function
+-- display channel value as name  
 local function displayKey(x, y, key, value, font)
   if telemetryInfo[key] ~= -1 then
     if telemetryData[key] == value then
@@ -76,6 +89,7 @@ local function displayKey(x, y, key, value, font)
   end
 end
 
+-- display gauge from min to max value, catch if value is lower than min 
 local function displayGauge(x, y, w, h, fill, maxfill, min)
   if fill >= min then
     lcd.drawGauge(x, y, w, h, (fill - min) , (maxfill - min))
@@ -84,7 +98,7 @@ local function displayGauge(x, y, w, h, fill, maxfill, min)
   end
 end
 
--- display timer
+-- display timer with name
 local function displayTimer(x, y, key, font)
   if telemetryInfo[key] ~= -1 then
     lcd.drawText(x, y, telemetryName[key], font)
@@ -95,7 +109,7 @@ local function displayTimer(x, y, key, font)
   end
 end
 
--- define different screens
+-- define different screens, to add screens increment number, do NOT leave a number out
 screen[1] = function() 
     displayValue(1, 9, "VFAS", MIDSIZE)
     displayGauge(107, 9, 100, 12, telemetryData["VFAS"]/cellNum * 100, battery["max"] * 100, battery["min"] * 100)
@@ -123,13 +137,13 @@ screen[3] = function()
     displayKey(107, 19, "ch13", 1024, MIDSIZE+BLINK)
 end
 
+-- overall screen display, will call separate screen
 local function displayScreen(screenNum)  
-  lcd.drawScreenTitle(modelInfo.name .. "  (" .. cellNum .. "S)  " .. telemetryName["flightModeName"] .. telemetryData["flightModeName"], screenNum, #screen)
+  lcd.drawScreenTitle(modelInfo.name .. "  (" .. cellNum .. "S)  " .. telemetryName["flightModeName"] .. telemetryData["flightModeName"] .. version, screenNum, #screen)
   screen[screenNum]()
 end
 
--- sound funtions
--- to be played as well in the background
+-- sound funtions, to be played as well in the background
 local function playBatterySound(key, value, file)
 	local cellVoltage = telemetryData[key] / cellNum
 		
