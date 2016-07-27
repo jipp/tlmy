@@ -1,0 +1,280 @@
+-- tlmy.lua
+--
+
+-- dislay size
+local displayWidth = 212 
+local displayHeight = 64
+
+-- screen number and table
+local screenNum = 1
+local screen = {}
+
+-- telemetry tables
+local telemetryName = {}
+local telemetryUnit = {}
+local telemetryInfo = {}
+local telemetryData = {}
+local telemetrySound = {}
+
+-- model info
+local modelInfo = ""
+
+----------------------------------------------------------------------
+-- battery limits
+local cellNum = 3 -- adjustable via +/- in all screens
+local batterySound = {}
+local battery = { 
+  min = 3.2,
+	critical = 3.3,
+	low = 3.5,
+	max = 4.3 }
+	
+----------------------------------------------------------------------
+-- rssi limits
+local rssi = {
+  min = 35,
+  critical = 42,
+  low = 45,
+  max = 105 }
+
+----------------------------------------------------------------------
+-- helper funtions
+local function getTelemetryId(name)
+   fieldInfo = getFieldInfo(name)
+   if fieldInfo then
+    return fieldInfo["id"]
+  end
+  return -1
+end
+
+----------------------------------------------------------------------
+-- utility funxtion
+local function round(value, decimal)
+  local exp = 10^(decimal or 0)
+  return math.floor(value * exp + 0.5) / exp
+end
+
+-- display parameter
+local function displayValue(x, y, key, font)
+  if telemetryInfo[key] ~= -1 then
+    lcd.drawText(x, y, telemetryName[key] .. round(telemetryData[key], 2) .. telemetryUnit[key], font)
+    return 1
+  else 
+    return -1
+  end
+end
+
+-- display function
+local function displayKey(x, y, key, value, font)
+  if telemetryInfo[key] ~= -1 then
+    if telemetryData[key] == value then
+      lcd.drawText(x, y, telemetryName[key], font)
+    end
+    return 1
+  else
+    return -1
+  end
+end
+
+local function displayGauge(x, y, w, h, fill, maxfill, min)
+  if fill >= min then
+    lcd.drawGauge(x, y, w, h, (fill - min) , (maxfill - min))
+  else
+    lcd.drawRectangle(x, y, w, h)
+  end
+end
+
+-- display timer
+local function displayTimer(x, y, key, font)
+  if telemetryInfo[key] ~= -1 then
+    lcd.drawText(x, y, telemetryName[key], font)
+    lcd.drawTimer(lcd.getLastPos(), y, telemetryData[key], font)
+    return 1
+  else
+    return -1
+  end
+end
+
+-- define different screens
+screen[1] = function() 
+    displayValue(1, 9, "VFAS", MIDSIZE)
+    displayGauge(107, 9, 100, 12, telemetryData["VFAS"]/cellNum * 100, battery["max"] * 100, battery["min"] * 100)
+    displayValue(1, 25, "RSSI", MIDSIZE)
+    displayGauge(107, 25, 100, 12, telemetryData["RSSI"], rssi["max"], rssi["min"])
+    displayValue(1, 41, "Curr", SMLSIZE)
+    displayValue(1, 49, "Fuel", SMLSIZE)
+    displayValue(107, 41, "RxBt", SMLSIZE)
+end
+
+screen[2] = function() 
+    displayValue(1, 9,  "Alt", MIDSIZE)
+    displayValue(107, 9,  "Alt+", SMLSIZE)
+    displayValue(107, 17,  "Alt-", SMLSIZE)
+    displayValue(1, 25, "VSpd", MIDSIZE)
+    displayValue(107, 25, "VSpd+", SMLSIZE)
+    displayValue(107, 33, "VSpd-", SMLSIZE)
+end
+
+screen[3] = function()
+    displayKey(1, 9, "ch6", 0, SMLSIZE)
+    displayKey(61, 9, "ch11", 0, SMLSIZE)
+    displayKey(101, 9, "ch7", 0, SMLSIZE)
+    displayTimer(1, 19, "timer1", MIDSIZE)
+    displayKey(107, 19, "ch13", 1024, MIDSIZE+BLINK)
+end
+
+local function displayScreen(screenNum)  
+  lcd.drawScreenTitle(modelInfo.name .. "  (" .. cellNum .. "S)  " .. telemetryName["flightModeName"] .. telemetryData["flightModeName"], screenNum, #screen)
+  screen[screenNum]()
+end
+
+-- sound funtions
+-- to be played as well in the background
+local function playBatterySound(key, value, file)
+	local cellVoltage = telemetryData[key] / cellNum
+		
+	if cellVoltage <= battery[value] then
+		if batterySound[value] ~= battery[value] then
+			playFile(file)
+			batterySound[value] = battery[value]
+		end
+	elseif cellVoltage > battery[value] then
+		batterySound[value] = ""
+	end
+end
+
+local function playSound(key, value, file)
+  if telemetryData[key] == value then
+      if telemetrySound[key] ~= value then
+        playFile(file)
+        telemetrySound[key] = value
+      end
+  end
+end
+
+-- re-read vars
+local function resetVars()
+  for key, value in pairs(telemetryName) do
+    if key == "flightModeName" then
+      telemetryInfo[key] = "flightModeName"
+    else
+      telemetryInfo[key] = getTelemetryId(key)
+    end
+  end
+
+  modelInfo = model.getInfo()
+end
+
+-- skeleton funtions
+local function init_func()
+  -- init_func is called once when model is loaded  
+  telemetryName["Curr"] = "Curr: "
+  telemetryUnit["Curr"] = "A"
+  telemetryName["Fuel"] = "Fuel: "
+  telemetryUnit["Fuel"] = "mAh"
+  telemetryName["VFAS"] = "VFAS: "
+  telemetryUnit["VFAS"] = "V"
+  telemetryName["Alt"] = "Alt: "
+  telemetryUnit["Alt"] = "m/s"
+  telemetryName["Alt-"] = "min. Alt: "
+  telemetryUnit["Alt-"] = "m/s"
+  telemetryName["Alt+"] = "max. Alt: "
+  telemetryUnit["Alt+"] = "m/s"
+  telemetryName["VSpd"] = "VSpd: "
+  telemetryUnit["VSpd"] = "m/s"
+  telemetryName["VSpd-"] = "min. VSpd: "  
+  telemetryUnit["VSpd-"] = "m/s"
+  telemetryName["VSpd+"] = "max. VSpd: "  
+  telemetryUnit["VSpd+"] = "m/s"
+  telemetryName["RSSI"] = "RSSI: "
+  telemetryUnit["RSSI"] = "dB"
+  telemetryName["RxBt"] = "RxBt: "
+  telemetryUnit["RxBt"] = "V/ratio"
+  telemetryName["timer1"] = "timer: "
+  telemetryName["ch5"] = "flight mode"
+  telemetryName["flightModeName"] = "FM: "
+  telemetryName["ch6"] = "baromode"
+  telemetryName["ch7"] = "airmode"
+  telemetryName["ch11"] = "gtune"
+  telemetryName["ch13"] = "armed"
+
+  for key, value in pairs(telemetryName) do
+    if key == "flightModeName" then
+      telemetryInfo[key] = "flightModeName"
+    else
+      telemetryInfo[key] = getTelemetryId(key)
+    end
+  end
+
+  modelInfo = model.getInfo()
+end
+
+local function bg_func()
+  -- bg_func is called periodically when screen is not visible
+  for key, value in pairs(telemetryName) do
+    if key == "flightModeName" then
+      telemetryData[key] = ( { getFlightMode() } )[2]
+    else
+      telemetryData[key] = getValue(telemetryInfo[key])
+    end
+  end
+  
+  playSound("ch5", 1024, "acromd.wav")
+  playSound("ch5", 0, "hrznmd.wav")
+  playSound("ch5", -1024, "anglmd.wav")
+  
+  playSound("ch6", 1024, "brmtrof.wav")  
+  playSound("ch6", 0, "brmtr.wav")
+  playSound("ch6", -1024, "brmtrof.wav")  
+
+  playSound("ch7", 1024, "")
+  playSound("ch7", 0, "bombawy.wav")
+  playSound("ch7", -1024, "")
+
+  playSound("ch11", 1024, "")
+  playSound("ch11", 0, "automd.wav")
+  playSound("ch11", -1024, "")
+
+  playSound("ch13", 1024, "thract.wav")
+  playSound("ch13", -1024, "thrdis.wav")
+
+  playBatterySound("VFAS", "low", "batlow.wav")
+  playBatterySound("VFAS", "critical", "batcrit.wav")
+end
+
+local function run_func(event)
+  -- run_func is called periodically when screen is visible
+  bg_func() -- run typically calls bg_func to start
+    
+  lcd.clear()
+    
+  if event == EVT_MENU_BREAK then  
+    resetVars()
+  end  
+  
+  if event == EVT_PLUS_BREAK then
+    cellNum = cellNum + 1
+  end
+  
+  if event == EVT_MINUS_BREAK then
+    cellNum = cellNum - 1
+  end
+  
+  if event == EVT_PAGE_BREAK then
+    screenNum = screenNum + 1
+    if screenNum > #screen then
+      screenNum = 1
+    end
+  end
+  
+  if event == EVT_PAGE_LONG then
+    screenNum = screenNum - 1
+    if screenNum < 1 then
+      screenNum = #screen
+    end
+  end
+    
+  displayScreen(screenNum)
+end
+
+return { run=run_func, background=bg_func, init=init_func  }
