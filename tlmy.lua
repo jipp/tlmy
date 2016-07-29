@@ -3,11 +3,16 @@
   
   Date: 27.07.2016
   Author: wolfgang.kellerlwobilix.de
+  
+  ToDo:
+   -read TimerName
+   - offset graphical
+  
 ]]--
 
 ----------------------------------------------------------------------
 -- Version String
-local version = " - v0.9.1" 
+local version = " - v0.9.2" 
 
 ----------------------------------------------------------------------
 -- dislay size for reciever
@@ -42,6 +47,10 @@ local battery = {
 	max = 4.3 }
 	
 ----------------------------------------------------------------------
+-- heading offset
+local headingOffset = 0
+	
+----------------------------------------------------------------------
 -- rssi limits, critical and ow vale are copied from radio
 local rssi = {
   min = 40,
@@ -68,9 +77,13 @@ end
 
 ----------------------------------------------------------------------
 -- display value with name and unit
-local function displayValue(x, y, key, font)
+local function displayValue(x, y, key, font, offset)
   if telemetryInfo[key] ~= -1 then
-    lcd.drawText(x, y, telemetryName[key] .. round(telemetryData[key], 2) .. telemetryUnit[key], font)
+    if offset == nil then
+      lcd.drawText(x, y, telemetryName[key] .. round(telemetryData[key], 2) .. telemetryUnit[key], font)
+    else
+      lcd.drawText(x, y, telemetryName[key] .. round(telemetryData[key] - offset, 2) .. telemetryUnit[key], font)
+    end      
     return 1
   else 
     return -1
@@ -134,7 +147,7 @@ screen[3] = function()
     displayKey(1+displayWidth/2, 9, "ch8", 0 , SMLSIZE)
     displayKey(1+displayWidth*3/4, 9, "ch11", 0, SMLSIZE)
     displayTimer(1, 19, "timer1", MIDSIZE)
-    displayValue(107, 19, "Hdg", MIDSIZE)
+    displayValue(107, 19, "Hdg", MIDSIZE, headingOffset)
     displayKey(80, 41, "ch13", 1024, MIDSIZE+BLINK)
 end
 
@@ -177,6 +190,12 @@ local function resetVars()
     end
   end
 
+  if telemetryInfo["Hdg"] ~= -1 then
+    headingOffset = telemetryData["Hdg"]
+  else
+    headingOffset = 0
+  end
+
   modelInfo = model.getInfo()
 end
 
@@ -186,11 +205,11 @@ local function init_func()
   telemetryName["VFAS"] = "VFAS: "
   telemetryUnit["VFAS"] = "V"
   telemetryName["Alt"] = "Alt: "
-  telemetryUnit["Alt"] = "m/s"
+  telemetryUnit["Alt"] = "m"
   telemetryName["Alt-"] = "min. Alt: "
-  telemetryUnit["Alt-"] = "m/s"
+  telemetryUnit["Alt-"] = "m"
   telemetryName["Alt+"] = "max. Alt: "
-  telemetryUnit["Alt+"] = "m/s"
+  telemetryUnit["Alt+"] = "m"
   telemetryName["VSpd"] = "VSpd: "
   telemetryUnit["VSpd"] = "m/s"
   telemetryName["VSpd-"] = "min. VSpd: "  
