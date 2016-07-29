@@ -7,7 +7,7 @@
 
 ----------------------------------------------------------------------
 -- Version String
-local version = " - v0.9" 
+local version = " - v0.9.1" 
 
 ----------------------------------------------------------------------
 -- dislay size for reciever
@@ -44,7 +44,7 @@ local battery = {
 ----------------------------------------------------------------------
 -- rssi limits, critical and ow vale are copied from radio
 local rssi = {
-  min = 50,
+  min = 40,
   critical = 42,
   low = 45,
   max = 105 }
@@ -62,8 +62,8 @@ end
 ----------------------------------------------------------------------
 -- mathematical utility function
 local function round(value, decimal)
-  local exp = 10^(decimal or 0)
-  return math.floor(value * exp + 0.5) / exp
+  local exponent = 10^(decimal or 0)
+  return math.floor(value * exponent + 0.5) / exponent
 end
 
 ----------------------------------------------------------------------
@@ -115,9 +115,7 @@ screen[1] = function()
     displayGauge(107, 9, 100, 12, telemetryData["VFAS"]/cellNum * 100, battery["max"] * 100, battery["min"] * 100)
     displayValue(1, 25, "RSSI", MIDSIZE)
     displayGauge(107, 25, 100, 12, telemetryData["RSSI"], rssi["max"], rssi["min"])
-    displayValue(1, 41, "Curr", SMLSIZE)
-    displayValue(1, 49, "Fuel", SMLSIZE)
-    displayValue(107, 41, "RxBt", SMLSIZE)
+    displayKey(80, 41, "ch13", 1024, MIDSIZE+BLINK)
 end
 
 screen[2] = function() 
@@ -127,14 +125,17 @@ screen[2] = function()
     displayValue(1, 25, "VSpd", MIDSIZE)
     displayValue(107, 25, "VSpd+", SMLSIZE)
     displayValue(107, 33, "VSpd-", SMLSIZE)
+    displayKey(80, 41, "ch13", 1024, MIDSIZE+BLINK)
 end
 
 screen[3] = function()
     displayKey(1, 9, "ch6", 0, SMLSIZE)
-    displayKey(61, 9, "ch11", 0, SMLSIZE)
-    displayKey(101, 9, "ch7", 0, SMLSIZE)
+    displayKey(1+displayWidth/4, 9, "ch7", 0, SMLSIZE)
+    displayKey(1+displayWidth/2, 9, "ch8", 0 , SMLSIZE)
+    displayKey(1+displayWidth*3/4, 9, "ch11", 0, SMLSIZE)
     displayTimer(1, 19, "timer1", MIDSIZE)
-    displayKey(107, 19, "ch13", 1024, MIDSIZE+BLINK)
+    displayValue(107, 19, "Hdg", MIDSIZE)
+    displayKey(80, 41, "ch13", 1024, MIDSIZE+BLINK)
 end
 
 -- overall screen display, will call separate screen
@@ -182,10 +183,6 @@ end
 -- skeleton funtions
 local function init_func()
   -- init_func is called once when model is loaded  
-  telemetryName["Curr"] = "Curr: "
-  telemetryUnit["Curr"] = "A"
-  telemetryName["Fuel"] = "Fuel: "
-  telemetryUnit["Fuel"] = "mAh"
   telemetryName["VFAS"] = "VFAS: "
   telemetryUnit["VFAS"] = "V"
   telemetryName["Alt"] = "Alt: "
@@ -202,15 +199,16 @@ local function init_func()
   telemetryUnit["VSpd+"] = "m/s"
   telemetryName["RSSI"] = "RSSI: "
   telemetryUnit["RSSI"] = "dB"
-  telemetryName["RxBt"] = "RxBt: "
-  telemetryUnit["RxBt"] = "V/ratio"
+  telemetryName["Hdg"] = "Heading: "
+  telemetryUnit["Hdg"] = ""
   telemetryName["timer1"] = "timer: "
   telemetryName["ch5"] = "flight mode"
-  telemetryName["flightModeName"] = "FM: "
   telemetryName["ch6"] = "baromode"
   telemetryName["ch7"] = "airmode"
+  telemetryName["ch8"] = "beeper"
   telemetryName["ch11"] = "gtune"
   telemetryName["ch13"] = "armed"
+  telemetryName["flightModeName"] = "FM: "
 
   for key, value in pairs(telemetryName) do
     if key == "flightModeName" then
