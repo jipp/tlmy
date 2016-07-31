@@ -6,13 +6,13 @@
   
   ToDo:
    -read TimerName
-   - offset graphical
+   -offset graphical
   
 ]]--
 
 ----------------------------------------------------------------------
 -- Version String
-local version = " - v0.9.2" 
+local version = " - v0.10.0" 
 
 ----------------------------------------------------------------------
 -- dislay size for reciever
@@ -26,9 +26,31 @@ local screen = {}
 
 ----------------------------------------------------------------------
 -- telemetry tables
+local telemetry = {}
+  telemetry["VFAS"] = "V"
+  telemetry["Alt"] = "m"
+  telemetry["Alt-"] = "m"
+  telemetry["Alt+"] = "m"
+  telemetry["VSpd"] = "m/s"
+  telemetry["VSpd-"] = "m/s"
+  telemetry["VSpd+"] = "m/s"
+  telemetry["RSSI"] = "dB"
+  telemetry["Hdg"] = ""
+  telemetry["timer1"] = ""
+  telemetry["ch5"] = "mode"
+  telemetry["ch6"] = "baro"
+  telemetry["ch7"] = "air"
+  telemetry["ch8"] = "beeper"
+  telemetry["ch11"] = "gtune"
+  telemetry["ch13"] = "arm"
+  telemetry["flightModeName"] = ""
+
+----------------------------------------------------------------------
+-- telemetry tables
+local telemetryId = {}
 local telemetryName = {}
+local telemetryDesc = {}
 local telemetryUnit = {}
-local telemetryInfo = {}
 local telemetryData = {}
 local telemetrySound = {}
 
@@ -44,11 +66,8 @@ local battery = {
   min = 3.2,
 	critical = 3.3,
 	low = 3.5,
-	max = 4.3 }
-	
-----------------------------------------------------------------------
--- heading offset
-local headingOffset = 0
+	max = 4.3
+}
 	
 ----------------------------------------------------------------------
 -- rssi limits, critical and ow vale are copied from radio
@@ -56,14 +75,35 @@ local rssi = {
   min = 40,
   critical = 42,
   low = 45,
-  max = 105 }
+  max = 105
+}
 
 ----------------------------------------------------------------------
+-- heading offset
+local headingOffset = 0
+  
+----------------------------------------------------------------------
 -- helper funtion
-local function getTelemetryId(name)
-   fieldInfo = getFieldInfo(name)
+local function getTelemetryId(key)
+   fieldInfo = getFieldInfo(key)
    if fieldInfo then
     return fieldInfo["id"]
+  end
+  return -1
+end
+
+local function getTelemetryName(key)
+  fieldInfo = getFieldInfo(key)
+   if fieldInfo then
+    return fieldInfo["name"]
+  end
+  return -1
+end
+
+local function getTelemetryDesc(key)
+  fieldInfo = getFieldInfo(key)
+   if fieldInfo then
+    return fieldInfo["desc"]
   end
   return -1
 end
@@ -78,11 +118,11 @@ end
 ----------------------------------------------------------------------
 -- display value with name and unit
 local function displayValue(x, y, key, font, offset)
-  if telemetryInfo[key] ~= -1 then
+  if telemetryId[key] ~= -1 then
     if offset == nil then
-      lcd.drawText(x, y, telemetryName[key] .. round(telemetryData[key], 2) .. telemetryUnit[key], font)
+      lcd.drawText(x, y, telemetryName[key] .. ": " ..  round(telemetryData[key], 2) .. telemetryUnit[key], font)
     else
-      lcd.drawText(x, y, telemetryName[key] .. round(telemetryData[key] - offset, 2) .. telemetryUnit[key], font)
+      lcd.drawText(x, y, telemetryName[key] .. ": " .. round(telemetryData[key] - offset, 2) .. telemetryUnit[key], font)
     end      
     return 1
   else 
@@ -92,9 +132,9 @@ end
 
 -- display channel value as name  
 local function displayKey(x, y, key, value, font)
-  if telemetryInfo[key] ~= -1 then
+  if telemetryId[key] ~= -1 then
     if telemetryData[key] == value then
-      lcd.drawText(x, y, telemetryName[key], font)
+      lcd.drawText(x, y, telemetryUnit[key], font)
     end
     return 1
   else
@@ -113,8 +153,8 @@ end
 
 -- display timer with name
 local function displayTimer(x, y, key, font)
-  if telemetryInfo[key] ~= -1 then
-    lcd.drawText(x, y, telemetryName[key], font)
+  if telemetryId[key] ~= -1 then
+    lcd.drawText(x, y, telemetryName[key] .. ": ", font)
     lcd.drawTimer(lcd.getLastPos(), y, telemetryData[key], font)
     return 1
   else
@@ -124,31 +164,31 @@ end
 
 -- define different screens, to add screens increment number, do NOT leave a number out
 screen[1] = function() 
-    displayValue(1, 9, "VFAS", MIDSIZE)
-    displayGauge(107, 9, 100, 12, telemetryData["VFAS"]/cellNum * 100, battery["max"] * 100, battery["min"] * 100)
-    displayValue(1, 25, "RSSI", MIDSIZE)
-    displayGauge(107, 25, 100, 12, telemetryData["RSSI"], rssi["max"], rssi["min"])
-    displayKey(80, 41, "ch13", 1024, MIDSIZE+BLINK)
+  displayValue(1, 9, "VFAS", MIDSIZE)
+  displayGauge(107, 9, 100, 12, telemetryData["VFAS"]/cellNum * 100, battery["max"] * 100, battery["min"] * 100)
+  displayValue(1, 25, "RSSI", MIDSIZE)
+  displayGauge(107, 25, 100, 12, telemetryData["RSSI"], rssi["max"], rssi["min"])
+  displayKey(80, 41, "ch13", 1024, MIDSIZE+INVERS+BLINK)
 end
 
 screen[2] = function() 
-    displayValue(1, 9,  "Alt", MIDSIZE)
-    displayValue(107, 9,  "Alt+", SMLSIZE)
-    displayValue(107, 17,  "Alt-", SMLSIZE)
-    displayValue(1, 25, "VSpd", MIDSIZE)
-    displayValue(107, 25, "VSpd+", SMLSIZE)
-    displayValue(107, 33, "VSpd-", SMLSIZE)
-    displayKey(80, 41, "ch13", 1024, MIDSIZE+BLINK)
+  displayValue(1, 9,  "Alt", MIDSIZE)
+  displayValue(107, 9,  "Alt+", SMLSIZE)
+  displayValue(107, 17,  "Alt-", SMLSIZE)
+  displayValue(1, 25, "VSpd", MIDSIZE)
+  displayValue(107, 25, "VSpd+", SMLSIZE)
+  displayValue(107, 33, "VSpd-", SMLSIZE)
+  displayKey(80, 41, "ch13", 1024, MIDSIZE+INVERS+BLINK)
 end
 
 screen[3] = function()
-    displayKey(1, 9, "ch6", 0, SMLSIZE)
-    displayKey(1+displayWidth/4, 9, "ch7", 0, SMLSIZE)
-    displayKey(1+displayWidth/2, 9, "ch8", 0 , SMLSIZE)
-    displayKey(1+displayWidth*3/4, 9, "ch11", 0, SMLSIZE)
-    displayTimer(1, 19, "timer1", MIDSIZE)
-    displayValue(107, 19, "Hdg", MIDSIZE, headingOffset)
-    displayKey(80, 41, "ch13", 1024, MIDSIZE+BLINK)
+  displayKey(1, 9, "ch6", 0, SMLSIZE)
+  displayKey(1+displayWidth/4, 9, "ch7", 0, SMLSIZE)
+  displayKey(1+displayWidth/2, 9, "ch8", 0 , SMLSIZE)
+  displayKey(1+displayWidth*3/4, 9, "ch11", 0, SMLSIZE)
+  displayTimer(1, 19, "timer1", MIDSIZE)
+  displayValue(107, 19, "Hdg", MIDSIZE, headingOffset)
+  displayKey(80, 41, "ch13", 1024, MIDSIZE+INVERS+BLINK)
 end
 
 -- overall screen display, will call separate screen
@@ -180,62 +220,41 @@ local function playSound(key, value, file)
   end
 end
 
--- re-read vars
-local function resetVars()
-  for key, value in pairs(telemetryName) do
+-- offset calculation
+local function getOffset(key)
+  if telemetryId[key] ~= -1 then
+    return telemetryData[key]
+  end
+  return 0
+end
+
+local function initTable()
+  for key, value in pairs(telemetry) do
     if key == "flightModeName" then
-      telemetryInfo[key] = "flightModeName"
-    else
-      telemetryInfo[key] = getTelemetryId(key)
+      telemetryId[key] = "flightModeName"
+      telemetryName[key] = ""
+      telemetryDesc[key] = ""
+      telemetryUnit[key] = value
+      telemetryData[key] = ( { getFlightMode() } )[2]
+    else      
+      telemetryId[key] = getTelemetryId(key)
+      telemetryName[key] = getTelemetryName(key)
+      telemetryDesc[key] = getTelemetryDesc(key)
+      telemetryUnit[key] = value
+      telemetryData[key] = getValue(telemetryId[key])
     end
-  end
+  end 
+end
 
-  if telemetryInfo["Hdg"] ~= -1 then
-    headingOffset = telemetryData["Hdg"]
-  else
-    headingOffset = 0
-  end
-
-  modelInfo = model.getInfo()
+-- reset heading
+local function resetVars()
+  headingOffset = getOffset("Hdg")
 end
 
 -- skeleton funtions
 local function init_func()
   -- init_func is called once when model is loaded  
-  telemetryName["VFAS"] = "VFAS: "
-  telemetryUnit["VFAS"] = "V"
-  telemetryName["Alt"] = "Alt: "
-  telemetryUnit["Alt"] = "m"
-  telemetryName["Alt-"] = "min. Alt: "
-  telemetryUnit["Alt-"] = "m"
-  telemetryName["Alt+"] = "max. Alt: "
-  telemetryUnit["Alt+"] = "m"
-  telemetryName["VSpd"] = "VSpd: "
-  telemetryUnit["VSpd"] = "m/s"
-  telemetryName["VSpd-"] = "min. VSpd: "  
-  telemetryUnit["VSpd-"] = "m/s"
-  telemetryName["VSpd+"] = "max. VSpd: "  
-  telemetryUnit["VSpd+"] = "m/s"
-  telemetryName["RSSI"] = "RSSI: "
-  telemetryUnit["RSSI"] = "dB"
-  telemetryName["Hdg"] = "Heading: "
-  telemetryUnit["Hdg"] = ""
-  telemetryName["timer1"] = "timer: "
-  telemetryName["ch5"] = "flight mode"
-  telemetryName["ch6"] = "baromode"
-  telemetryName["ch7"] = "airmode"
-  telemetryName["ch8"] = "beeper"
-  telemetryName["ch11"] = "gtune"
-  telemetryName["ch13"] = "armed"
-  telemetryName["flightModeName"] = "FM: "
-
-  for key, value in pairs(telemetryName) do
-    if key == "flightModeName" then
-      telemetryInfo[key] = "flightModeName"
-    else
-      telemetryInfo[key] = getTelemetryId(key)
-    end
-  end
+  initTable() 
 
   modelInfo = model.getInfo()
 end
@@ -246,7 +265,7 @@ local function bg_func()
     if key == "flightModeName" then
       telemetryData[key] = ( { getFlightMode() } )[2]
     else
-      telemetryData[key] = getValue(telemetryInfo[key])
+      telemetryData[key] = getValue(telemetryId[key])
     end
   end
   
