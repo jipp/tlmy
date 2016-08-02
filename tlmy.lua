@@ -2,17 +2,17 @@
   tlmy.lua
   
   Date: 27.07.2016
-  Author: wolfgang.kellerlwobilix.de
+  Author: wolfgang.keller@wobilix.de
   
   ToDo:
-   -read TimerName
-   -offset graphical
+   -battery alarm after timeout
+   
   
 ]]--
 
 ----------------------------------------------------------------------
 -- Version String
-local version = " - v0.10.0" 
+local version = "v0.10.2" 
 
 ----------------------------------------------------------------------
 -- dislay size for reciever
@@ -26,6 +26,7 @@ local screen = {}
 
 ----------------------------------------------------------------------
 -- telemetry tables
+-- the '-' and '+' at the end of some keys force to fill the table this way
 local telemetry = {}
   telemetry["VFAS"] = "V"
   telemetry["Alt"] = "m"
@@ -44,6 +45,7 @@ local telemetry = {}
   telemetry["ch11"] = "gtune"
   telemetry["ch13"] = "arm"
   telemetry["flightModeName"] = ""
+  telemetry["modelInfo"] = ""
 
 ----------------------------------------------------------------------
 -- telemetry tables
@@ -53,10 +55,6 @@ local telemetryDesc = {}
 local telemetryUnit = {}
 local telemetryData = {}
 local telemetrySound = {}
-
-----------------------------------------------------------------------
--- model info
-local modelInfo = ""
 
 ----------------------------------------------------------------------
 -- battery limits, can be changed on personal needs
@@ -120,10 +118,9 @@ end
 local function displayValue(x, y, key, font, offset)
   if telemetryId[key] ~= -1 then
     if offset == nil then
-      lcd.drawText(x, y, telemetryName[key] .. ": " ..  round(telemetryData[key], 2) .. telemetryUnit[key], font)
-    else
-      lcd.drawText(x, y, telemetryName[key] .. ": " .. round(telemetryData[key] - offset, 2) .. telemetryUnit[key], font)
+      offset = 0
     end      
+    lcd.drawText(x, y, telemetryName[key] .. ": " .. round(telemetryData[key] - offset, 2) .. telemetryUnit[key], font)
     return 1
   else 
     return -1
@@ -162,13 +159,24 @@ local function displayTimer(x, y, key, font)
   end
 end
 
+-- overall screen display, will call separate screen
+local function displayScreen(screenNum)  
+  lcd.drawScreenTitle(telemetryData["modelInfo"] .. "  (" .. cellNum .. "S)  " .. telemetryName["flightModeName"] .. telemetryData["flightModeName"] .. " - " .. version, screenNum, #screen)
+  screen[screenNum]()
+end
+
 -- define different screens, to add screens increment number, do NOT leave a number out
 screen[1] = function() 
   displayValue(1, 9, "VFAS", MIDSIZE)
   displayGauge(107, 9, 100, 12, telemetryData["VFAS"]/cellNum * 100, battery["max"] * 100, battery["min"] * 100)
   displayValue(1, 25, "RSSI", MIDSIZE)
   displayGauge(107, 25, 100, 12, telemetryData["RSSI"], rssi["max"], rssi["min"])
-  displayKey(80, 41, "ch13", 1024, MIDSIZE+INVERS+BLINK)
+  displayValue(107, 41, "Hdg", MIDSIZE, headingOffset)
+  displayKey(1, 41, "ch13", 1024, MIDSIZE+INVERS+BLINK)
+  displayKey(1, 56, "ch6", 0, SMLSIZE)
+  displayKey(1+displayWidth/4, 56, "ch7", 0, SMLSIZE)
+  displayKey(1+displayWidth/2, 56, "ch8", 0 , SMLSIZE)
+  displayKey(1+displayWidth*3/4, 56, "ch11", 0, SMLSIZE)
 end
 
 screen[2] = function() 
@@ -178,45 +186,41 @@ screen[2] = function()
   displayValue(1, 25, "VSpd", MIDSIZE)
   displayValue(107, 25, "VSpd+", SMLSIZE)
   displayValue(107, 33, "VSpd-", SMLSIZE)
-  displayKey(80, 41, "ch13", 1024, MIDSIZE+INVERS+BLINK)
-end
-
-screen[3] = function()
-  displayKey(1, 9, "ch6", 0, SMLSIZE)
-  displayKey(1+displayWidth/4, 9, "ch7", 0, SMLSIZE)
-  displayKey(1+displayWidth/2, 9, "ch8", 0 , SMLSIZE)
-  displayKey(1+displayWidth*3/4, 9, "ch11", 0, SMLSIZE)
-  displayTimer(1, 19, "timer1", MIDSIZE)
-  displayValue(107, 19, "Hdg", MIDSIZE, headingOffset)
-  displayKey(80, 41, "ch13", 1024, MIDSIZE+INVERS+BLINK)
-end
-
--- overall screen display, will call separate screen
-local function displayScreen(screenNum)  
-  lcd.drawScreenTitle(modelInfo.name .. "  (" .. cellNum .. "S)  " .. telemetryName["flightModeName"] .. telemetryData["flightModeName"] .. version, screenNum, #screen)
-  screen[screenNum]()
+  displayTimer(107, 41, "timer1", MIDSIZE)
+  displayKey(1, 41, "ch13", 1024, MIDSIZE+INVERS+BLINK)
 end
 
 -- sound funtions, to be played as well in the background
 local function playBatterySound(key, value, file)
-	local cellVoltage = telemetryData[key] / cellNum
-		
-	if cellVoltage <= battery[value] then
-		if batterySound[value] ~= battery[value] then
-			playFile(file)
-			batterySound[value] = battery[value]
-		end
-	elseif cellVoltage > battery[value] then
-		batterySound[value] = ""
-	end
+	local cellVoltage
+
+  if telemetryId[key] ~= -1 then
+    cellVoltage = telemetryData[key] / cellNum
+	  if cellVoltage <= battery[value] then
+		  if batterySound[value] ~= battery[value] then
+			  playFile(file)
+			  batterySound[value] = battery[value]
+		  end
+	  elseif cellVoltage > battery[value] then
+  		batterySound[value] = ""
+	  end
+    return 1
+	else 
+	  return -1
+  end
 end
 
 local function playSound(key, value, file)
-  if telemetryData[key] == value then
+  if telemetryId[key] ~= -1 then
+    if telemetryData[key] == value then
       if telemetrySound[key] ~= value then
         playFile(file)
         telemetrySound[key] = value
       end
+    end
+    return 1
+  else
+    return -1
   end
 end
 
@@ -236,6 +240,12 @@ local function initTable()
       telemetryDesc[key] = ""
       telemetryUnit[key] = value
       telemetryData[key] = ( { getFlightMode() } )[2]
+    elseif key == "modelInfo" then
+      telemetryId[key] = "modelInfo"
+      telemetryName[key] = ""
+      telemetryDesc[key] = ""
+      telemetryUnit[key] = value
+      telemetryData[key] = model.getInfo().name
     else      
       telemetryId[key] = getTelemetryId(key)
       telemetryName[key] = getTelemetryName(key)
@@ -246,17 +256,10 @@ local function initTable()
   end 
 end
 
--- reset heading
-local function resetVars()
-  headingOffset = getOffset("Hdg")
-end
-
 -- skeleton funtions
 local function init_func()
   -- init_func is called once when model is loaded  
   initTable() 
-
-  modelInfo = model.getInfo()
 end
 
 local function bg_func()
@@ -264,6 +267,8 @@ local function bg_func()
   for key, value in pairs(telemetryName) do
     if key == "flightModeName" then
       telemetryData[key] = ( { getFlightMode() } )[2]
+    elseif key == "modelInfo" then
+      telemetryData[key] = model.getInfo().name
     else
       telemetryData[key] = getValue(telemetryId[key])
     end
@@ -298,16 +303,23 @@ local function run_func(event)
     
   lcd.clear()
     
-  if event == EVT_MENU_BREAK then  
-    resetVars()
+  if event == EVT_ENTER_BREAK then  
+    headingOffset = getOffset("Hdg")
   end  
   
+  if event == EVT_EXIT_BREAK then  
+    headingOffset = 0
+  end  
+
   if event == EVT_PLUS_BREAK then
     cellNum = cellNum + 1
   end
   
   if event == EVT_MINUS_BREAK then
     cellNum = cellNum - 1
+    if cellNum < 1 then
+      cellNum = 1
+    end
   end
   
   if event == EVT_PAGE_BREAK then
