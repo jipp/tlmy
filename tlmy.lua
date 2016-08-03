@@ -47,8 +47,8 @@ local telemetry = {}
 ----------------------------------------------------------------------
 -- battery limits, can be changed on personal needs
 local cellNum = 3 -- adjustable via +/- in all screens
-local batterySound = {}
-local battery = { 
+local batteryFlag = {}
+local battery = {
   min = 3.2,
 	critical = 3.3,
 	low = 3.5,
@@ -154,18 +154,18 @@ screen[2] = function()
 end
 
 -- sound funtions, to be played as well in the background
-local function playBatterySound(key, value, file)
+local function checkBattery(key, value, file)
 	local cellVoltage
 
   if telemetry[key].id ~= nil then
     cellVoltage = telemetry[key].data / cellNum
 	  if cellVoltage <= battery[value] then
-		  if batterySound[value] ~= battery[value] then
-        batterySound[value] = battery[value]
+		  if batteryFlag[value] ~= battery[value] then
+        batteryFlag[value] = battery[value]
 			  playFile(file)
 		  end
 	  elseif cellVoltage > battery[value] then
-  		batterySound[value] = ""
+  		batteryFlag[value] = ""
 	  end
   end
 end
@@ -229,8 +229,8 @@ local function bg_func()
   playSound("ch13", 1024, "thract.wav")
   playSound("ch13", -1024, "thrdis.wav")
 
-  playBatterySound("VFAS", "low", "batlow.wav")
-  playBatterySound("VFAS", "critical", "batcrit.wav")
+  checkBattery("VFAS", "low", "batlow.wav")
+  checkBattery("VFAS", "critical", "batcrit.wav")
 end
 
 local function run_func(event)
