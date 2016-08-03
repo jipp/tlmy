@@ -5,13 +5,12 @@
   Author: wolfgang.keller@wobilix.de
   
   ToDo:
-   -battery alarm after timeout
   
 ]]--
 
 ----------------------------------------------------------------------
 -- Version String
-local version = "v0.10.3" 
+local version = "v0.11.0" 
 
 ----------------------------------------------------------------------
 -- dislay size for reciever
@@ -20,13 +19,13 @@ local displayHeight = 64
 
 ----------------------------------------------------------------------
 -- screen start number and table
-local screenNum = 1
+local screenDisplay = 1
 local screen = {}
 
 ----------------------------------------------------------------------
 -- telemetry tables
 -- the '-' and '+' at the end of some keys force to fill the table this way
-local telemetry = {}
+local telemetry = {} -- telemetry and unit
   telemetry["VFAS"] = "V"
   telemetry["Alt"] = "m"
   telemetry["Alt-"] = "m"
@@ -46,13 +45,18 @@ local telemetry = {}
 
 ----------------------------------------------------------------------
 -- battery limits, can be changed on personal needs
-local cellNum = 3 -- adjustable via +/- in all screens
-local batteryFlag = {}
 local battery = {
-  min = 3.2,
-	critical = 3.3,
-	low = 3.5,
-	max = 4.3
+  cels = 3, -- adjustable via +/- in all screens
+  min = 3.2,  -- minimal alllowed, used for diagram
+	critical = 3.3,  -- alarm for critical
+	low = 3.5, -- alarm for low
+	max = 4.3, -- maximal possible, used for diagram
+	delta = {
+	  low = 10, -- seconds 
+	  critical = 5 -- seconds
+	},
+	flag = {},
+	time = {}
 }
 	
 ----------------------------------------------------------------------
@@ -116,18 +120,18 @@ local function displayTimer(x, y, key, font)
 end
 
 -- overall screen display, will call separate screen
-local function displayScreen(screenNum) 
+local function displayScreen(screenDisplay) 
   local flightMode = ( { getFlightMode() } )[2]
   local modelName = model.getInfo().name
       
-  lcd.drawScreenTitle(modelName .. "  (" .. cellNum .. "S)  " .. flightMode .. " - " .. version, screenNum, #screen)
-  screen[screenNum]()
+  lcd.drawScreenTitle(modelName .. "  (" .. battery.cels .. "S)  " .. flightMode .. " - " .. version, screenDisplay, #screen)
+  screen[screenDisplay]()
 end
 
 -- define different screens, to add screens increment number, do NOT leave a number out
 screen[1] = function() 
   displayValue(1, 9, "VFAS", MIDSIZE)
-  displayGauge(107, 9, 100, 12, telemetry["VFAS"].data/cellNum * 100, battery["max"] * 100, battery["min"] * 100)
+  displayGauge(107, 9, 100, 12, telemetry["VFAS"].data/battery.cels * 100, battery["max"] * 100, battery["min"] * 100)
   displayValue(1, 25, "RSSI", MIDSIZE)
   displayGauge(107, 25, 100, 12, telemetry["RSSI"].data, rssi["max"], rssi["min"])
   displayValue(107, 41, "Hdg", MIDSIZE, headingOffset)
@@ -158,14 +162,23 @@ local function checkBattery(key, value, file)
 	local cellVoltage
 
   if telemetry[key].id ~= nil then
-    cellVoltage = telemetry[key].data / cellNum
+    cellVoltage = telemetry[key].data / battery.cels
 	  if cellVoltage <= battery[value] then
-		  if batteryFlag[value] ~= battery[value] then
-        batteryFlag[value] = battery[value]
-			  playFile(file)
+		  if battery.flag[value] ~= true then
+		    if battery.time[value] == nil then
+		      battery.time[value] = 0
+		    end
+		    if battery.delta[value] == nil then
+		      battery.delta[value] = 0
+		    end
+	   	  if getTime() - battery.time[value] > battery.delta[value] * 100 then
+          battery.flag[value] = true
+			    playFile(file)
+			  end
 		  end
 	  elseif cellVoltage > battery[value] then
-  		batteryFlag[value] = ""
+  		battery.flag[value] = false
+  	  battery.time[value] = getTime()
 	  end
   end
 end
@@ -248,31 +261,31 @@ local function run_func(event)
   end  
 
   if event == EVT_PLUS_BREAK then
-    cellNum = cellNum + 1
+    battery.cels = battery.cels + 1
   end
   
   if event == EVT_MINUS_BREAK then
-    cellNum = cellNum - 1
-    if cellNum < 1 then
-      cellNum = 1
+    battery.cels = battery.cels - 1
+    if battery.cels < 1 then
+      battery.cels = 1
     end
   end
   
   if event == EVT_PAGE_BREAK then
-    screenNum = screenNum + 1
-    if screenNum > #screen then
-      screenNum = 1
+    screenDisplay = screenDisplay + 1
+    if screenDisplay > #screen then
+      screenDisplay = 1
     end
   end
   
   if event == EVT_PAGE_LONG then
-    screenNum = screenNum - 1
-    if screenNum < 1 then
-      screenNum = #screen
+    screenDisplay = screenDisplay - 1
+    if screenDisplay < 1 then
+      screenDisplay = #screen
     end
   end
     
-  displayScreen(screenNum)
+  displayScreen(screenDisplay)
 end
 
 return { run=run_func, background=bg_func, init=init_func  }
