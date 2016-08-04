@@ -5,12 +5,13 @@
   Author: wolfgang.keller@wobilix.de
   
   ToDo:
+    - flughöhen Diagram
   
 ]]--
 
 ----------------------------------------------------------------------
 -- Version String
-local version = "v0.11.0" 
+local version = "v0.11.1" 
 
 ----------------------------------------------------------------------
 -- dislay size for reciever
@@ -65,7 +66,7 @@ local rssi = {
   min = 40,
   critical = 42,
   low = 45,
-  max = 105
+  max = 100
 }
 
 ----------------------------------------------------------------------
