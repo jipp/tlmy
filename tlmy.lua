@@ -11,12 +11,13 @@
 
 ----------------------------------------------------------------------
 -- Version String
-local version = "v0.11.1" 
+local version = "v0.11.2" 
 
 ----------------------------------------------------------------------
 -- dislay size for reciever
-local displayWidth = 212 
-local displayHeight = 64
+local display = {}
+  display["width"] = 212
+  display["height"] = 64 
 
 ----------------------------------------------------------------------
 -- screen start number and table
@@ -46,28 +47,59 @@ local telemetry = {} -- telemetry and unit
 
 ----------------------------------------------------------------------
 -- battery limits, can be changed on personal needs
-local battery = {
-  cels = 3, -- adjustable via +/- in all screens
-  min = 3.2,  -- minimal alllowed, used for diagram
-	critical = 3.3,  -- alarm for critical
-	low = 3.5, -- alarm for low
-	max = 4.3, -- maximal possible, used for diagram
-	delta = {
-	  low = 10, -- seconds 
-	  critical = 5 -- seconds
-	},
-	flag = {},
-	time = {}
-}
-	
+local battery = {}
+  battery["cels"] = 3
+  battery["min"] = 3.2
+  battery["critical"] = 3.3
+  battery["low"] = 3.5
+  battery["max"] = 4.3
+  battery["flag"] = {}
+  battery["time"] = {}
+  battery["delta"] = {}
+  battery["delta"]["low"] = 10
+  battery["delta"]["critical"] = 5
+  
 ----------------------------------------------------------------------
 -- rssi limits, critical and ow vale are copied from radio
-local rssi = {
-  min = 40,
-  critical = 42,
-  low = 45,
-  max = 100
-}
+local rssi = {}
+  rssi["min"] = 40
+  rssi["critical"] = 42
+  rssi["low"] = 45
+  rssi["max"] = 100
+
+----------------------------------------------------------------------
+-- ring buffer
+local buffer = {}
+  buffer.maxLength = 100
+  buffer.maxValue = 0
+  buffer.time = 0
+  buffer.delta = 1
+    
+function  buffer:Add(key)
+  if telemetry[key] ~= nil then
+    if getTime() - self.time > self.delta * 100 then
+      self.time = getTime()
+      for index = self.maxLength, 2, -1 do
+        if self[index - 1] ~= nil then
+          self[index] = self[index - 1]
+        else
+          self[index] = nil
+        end
+      end
+      self[1] = telemetry[key].data  
+    end 
+  end
+end
+
+function buffer:Max()
+  self.maxValue = self[1]
+  for index = 1, #self - 1, 1 do
+    if self[index] > self.maxValue then
+      self.maxValue = self[index]
+    end
+  end
+  return self.maxValue
+end
 
 ----------------------------------------------------------------------
 -- heading offset
@@ -83,7 +115,7 @@ end
 ----------------------------------------------------------------------
 -- display value with name and unit
 local function displayValue(x, y, key, font, offset)
-  if telemetry[key].id ~= nil then
+  if telemetry[key] ~= nil then
     if offset == nil then
       offset = 0
     end      
@@ -93,7 +125,7 @@ end
 
 -- display channel value as name  
 local function displayKey(x, y, key, value, font)
-  if telemetry[key].id ~= nil then
+  if telemetry[key] ~= nil then
     if telemetry[key].data == value then
       lcd.drawText(x, y, telemetry[key].unit, font)
     end
@@ -101,17 +133,27 @@ local function displayKey(x, y, key, value, font)
 end
 
 -- display gauge from min to max value, catch if value is lower than min 
-local function displayGauge(x, y, w, h, fill, maxfill, min)
-  if fill >= min then
-    lcd.drawGauge(x, y, w, h, (fill - min) , (maxfill - min))
-  else
-    lcd.drawRectangle(x, y, w, h)
+local function displayGauge(x, y, w, h, key, border, norm, factor)
+  if telemetry[key] ~= nil then
+    if norm == nil then
+      norm = 1
+    end
+    if factor == nil then
+      factor = 1
+    end
+    if telemetry[key].data / norm >= border["max"] then
+      lcd.drawFilledRectangle(x, y, w, h, SOLID)
+    elseif telemetry[key].data / norm >= border["min"] then
+      lcd.drawGauge(x, y, w, h, (telemetry[key].data / norm - border["min"]) * factor , (border["max"] - border["min"]) * factor)
+    else
+      lcd.drawRectangle(x, y, w, h)
+    end
   end
 end
 
 -- display timer with name
 local function displayTimer(x, y, key, font)
-  if telemetry[key].id ~= nil then
+  if telemetry[key] ~= nil then
     lcd.drawText(x, y, telemetry[key].name .. ": ", font)
     lcd.drawTimer(lcd.getLastPos(), y, telemetry[key].data, font)
     return 1
@@ -125,22 +167,36 @@ local function displayScreen(screenDisplay)
   local flightMode = ( { getFlightMode() } )[2]
   local modelName = model.getInfo().name
       
-  lcd.drawScreenTitle(modelName .. "  (" .. battery.cels .. "S)  " .. flightMode .. " - " .. version, screenDisplay, #screen)
+  lcd.drawScreenTitle(modelName .. "  (" .. battery["cels"] .. "S)  " .. flightMode .. " - " .. version, screenDisplay, #screen)
   screen[screenDisplay]()
+end
+
+-- display diagram
+local function displayDiagram(values)
+  local max = values:Max()
+    
+  for index = 1, #values - 1, 1 do
+    lcd.drawLine(index, 50, index, 10 + 40 * (1 - values[index] / max), SOLID,GREY_DEFAULT)
+    lcd.drawPoint(index, 10 + 40 * (1 - values[index] / max), SOLID, FORCE)
+  end
+  
+  lcd.drawLine(1,10,1,50,SOLID, FORCE)
+  lcd.drawLine(1,50,#values,50,SOLID, FORCE)
+  
 end
 
 -- define different screens, to add screens increment number, do NOT leave a number out
 screen[1] = function() 
   displayValue(1, 9, "VFAS", MIDSIZE)
-  displayGauge(107, 9, 100, 12, telemetry["VFAS"].data/battery.cels * 100, battery["max"] * 100, battery["min"] * 100)
+  displayGauge(107, 9, 100, 12, "VFAS", battery, battery["cels"], 100)
   displayValue(1, 25, "RSSI", MIDSIZE)
-  displayGauge(107, 25, 100, 12, telemetry["RSSI"].data, rssi["max"], rssi["min"])
+  displayGauge(107, 25, 100, 12, "RSSI", rssi)
   displayValue(107, 41, "Hdg", MIDSIZE, headingOffset)
   displayKey(1, 41, "ch13", 1024, MIDSIZE+INVERS+BLINK)
   displayKey(1, 56, "ch6", 0, SMLSIZE)
-  displayKey(1+displayWidth/4, 56, "ch7", 0, SMLSIZE)
-  displayKey(1+displayWidth/2, 56, "ch8", 0 , SMLSIZE)
-  displayKey(1+displayWidth*3/4, 56, "ch11", 0, SMLSIZE)
+  displayKey(1+display["width"]/4, 56, "ch7", 0, SMLSIZE)
+  displayKey(1+display["width"]/2, 56, "ch8", 0 , SMLSIZE)
+  displayKey(1+display["width"]*3/4, 56, "ch11", 0, SMLSIZE)
 end
 
 screen[2] = function() 
@@ -153,17 +209,21 @@ screen[2] = function()
   displayTimer(107, 41, "timer1", MIDSIZE)
   displayKey(1, 41, "ch13", 1024, MIDSIZE+INVERS+BLINK)
   displayKey(1, 56, "ch6", 0, SMLSIZE)
-  displayKey(1+displayWidth/4, 56, "ch7", 0, SMLSIZE)
-  displayKey(1+displayWidth/2, 56, "ch8", 0 , SMLSIZE)
-  displayKey(1+displayWidth*3/4, 56, "ch11", 0, SMLSIZE)
+  displayKey(1+display["width"]/4, 56, "ch7", 0, SMLSIZE)
+  displayKey(1+display["width"]/2, 56, "ch8", 0 , SMLSIZE)
+  displayKey(1+display["width"]*3/4, 56, "ch11", 0, SMLSIZE)
+end
+
+screen[3] = function() 
+  displayDiagram(buffer)
 end
 
 -- sound funtions, to be played as well in the background
 local function checkBattery(key, value, file)
 	local cellVoltage
 
-  if telemetry[key].id ~= nil then
-    cellVoltage = telemetry[key].data / battery.cels
+  if telemetry[key] ~= nil then
+    cellVoltage = telemetry[key].data / battery["cels"]
 	  if cellVoltage <= battery[value] then
 		  if battery.flag[value] ~= true then
 		    if battery.time[value] == nil then
@@ -185,7 +245,7 @@ local function checkBattery(key, value, file)
 end
 
 local function playSound(key, value, file)
-  if telemetry[key].id ~= nil then
+  if telemetry[key] ~= nil then
     if telemetry[key].data == value then
       if telemetry[key].sound ~= value then
         telemetry[key].sound = value
@@ -197,7 +257,7 @@ end
 
 -- offset calculation
 local function getOffset(key)
-  if telemetry[key].id ~= nil then
+  if telemetry[key] ~= nil then
     return telemetry[key].data
   else
     return 0
@@ -207,8 +267,10 @@ end
 local function initTable()
   for key, value in pairs(telemetry) do
     telemetry[key] = getFieldInfo(key)
-    telemetry[key].unit = value
-    telemetry[key].data = ""
+    if telemetry[key] ~= nil then  
+      telemetry[key].unit = value
+      telemetry[key].data = ""
+    end
   end 
 end
 
@@ -221,7 +283,9 @@ end
 local function bg_func()
   -- bg_func is called periodically when screen is not visible
   for key, value in pairs(telemetry) do
-    telemetry[key].data = getValue(telemetry[key].id)
+    if telemetry[key] ~= nil then
+      telemetry[key].data = getValue(telemetry[key].id)
+    end
   end
   
   playSound("ch5", 1024, "acromd.wav")
@@ -244,7 +308,9 @@ local function bg_func()
   playSound("ch13", -1024, "thrdis.wav")
 
   checkBattery("VFAS", "low", "batlow.wav")
-  checkBattery("VFAS", "critical", "batcrit.wav")
+  checkBattery("VFAS", "critical", "batcrit.wav")  
+  
+  buffer:Add("Alt")
 end
 
 local function run_func(event)
@@ -262,13 +328,13 @@ local function run_func(event)
   end  
 
   if event == EVT_PLUS_BREAK then
-    battery.cels = battery.cels + 1
+    battery["cels"] = battery["cels"] + 1
   end
   
   if event == EVT_MINUS_BREAK then
-    battery.cels = battery.cels - 1
-    if battery.cels < 1 then
-      battery.cels = 1
+    battery["cels"] = battery["cels"] - 1
+    if battery["cels"] < 1 then
+      battery["cels"] = 1
     end
   end
   
