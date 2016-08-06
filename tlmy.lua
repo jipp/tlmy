@@ -11,18 +11,7 @@
 
 ----------------------------------------------------------------------
 -- Version String
-local version = "v0.11.2" 
-
-----------------------------------------------------------------------
--- dislay size for reciever
-local display = {}
-  display["width"] = 212
-  display["height"] = 64 
-
-----------------------------------------------------------------------
--- screen start number and table
-local screenDisplay = 1
-local screen = {}
+local version = "v0.11.3" 
 
 ----------------------------------------------------------------------
 -- telemetry tables
@@ -59,6 +48,42 @@ local battery = {}
   battery["delta"]["low"] = 10
   battery["delta"]["critical"] = 5
   
+function battery:Increment()
+  self.cels = self.cels + 1
+end
+
+function battery:Decrement()
+  self.cels = self.cels - 1
+  if self.cels < 1 then
+    self.cels = 1
+  end
+end
+  
+function battery:Check(key, value, file)
+  local cellVoltage
+
+  if telemetry[key] ~= nil then
+    cellVoltage = telemetry[key].data / self["cels"]
+    if cellVoltage <= self[value] then
+      if self.flag[value] ~= true then
+        if self.time[value] == nil then
+          self.time[value] = 0
+        end
+        if self.delta[value] == nil then
+          self.delta[value] = 0
+        end
+        if getTime() - self.time[value] > self.delta[value] * 100 then
+          self.flag[value] = true
+          playFile(file)
+        end
+      end
+    elseif cellVoltage > self[value] then
+      self.flag[value] = false
+      self.time[value] = getTime()
+    end
+  end
+end
+  
 ----------------------------------------------------------------------
 -- rssi limits, critical and ow vale are copied from radio
 local rssi = {}
@@ -66,16 +91,101 @@ local rssi = {}
   rssi["critical"] = 42
   rssi["low"] = 45
   rssi["max"] = 100
+  
+----------------------------------------------------------------------
+-- mathematical utility function
+local function round(value, decimal)
+  local exponent = 10^(decimal or 0)
+  return math.floor(value * exponent + 0.5) / exponent
+end  
+
+----------------------------------------------------------------------
+-- dislay size for reciever
+local display = {}
+  display["width"] = 212
+  display["height"] = 64 
+  
+function display:Value(x, y, key, font, offset)
+  if telemetry[key] ~= nil then
+    if offset == nil then
+      offset = 0
+    end      
+    lcd.drawText(x, y, telemetry[key].name .. ": " .. round(telemetry[key].data - offset, 2) .. telemetry[key].unit, font)
+  end
+end
+
+function display:Key(x, y, key, value, font)
+  if telemetry[key] ~= nil then
+    if telemetry[key].data == value then
+      lcd.drawText(x, y, telemetry[key].unit, font)
+    end
+  end
+end
+
+function display:Gauge(x, y, w, h, key, border, norm, factor)
+  if telemetry[key] ~= nil then
+    if norm == nil then
+      norm = 1
+    end
+    if factor == nil then
+      factor = 1
+    end
+    if telemetry[key].data / norm >= border["max"] then
+      lcd.drawFilledRectangle(x, y, w, h, SOLID)
+    elseif telemetry[key].data / norm >= border["min"] then
+      lcd.drawGauge(x, y, w, h, (telemetry[key].data / norm - border["min"]) * factor , (border["max"] - border["min"]) * factor)
+    else
+      lcd.drawRectangle(x, y, w, h)
+    end
+  end
+end
+
+function display:Timer(x, y, key, font)
+  if telemetry[key] ~= nil then
+    lcd.drawText(x, y, telemetry[key].name .. ": ", font)
+    lcd.drawTimer(lcd.getLastPos(), y, telemetry[key].data, font)
+    return 1
+  else
+    return -1
+  end
+end
+
+function display:Diagram(values)
+  local max = values:Max()
+    
+  for index = 1, #values - 1, 1 do
+    lcd.drawLine(index, 50, index, 10 + 40 * (1 - values[index] / max), SOLID,GREY_DEFAULT)
+    lcd.drawPoint(index, 10 + 40 * (1 - values[index] / max), SOLID, FORCE)
+  end
+  
+  lcd.drawLine(1,10,1,50,SOLID, FORCE)
+  lcd.drawLine(1,50,#values,50,SOLID, FORCE)
+end
+
+function display:Show(screen) 
+  local flightMode = ( { getFlightMode() } )[2]
+  local modelName = model.getInfo().name
+      
+  lcd.drawScreenTitle(modelName .. "  (" .. battery["cels"] .. "S)  " .. flightMode .. " - " .. version, screen.num, #screen)
+  screen[screen.num]()
+end
 
 ----------------------------------------------------------------------
 -- ring buffer
 local buffer = {}
-  buffer.maxLength = 100
-  buffer.maxValue = 0
-  buffer.time = 0
-  buffer.delta = 1
+  buffer["maxLength"] = 100
+  buffer["maxValue"] = 0
+  buffer["time"] = 0
+  buffer["delta"] = 1
+  
+function buffer:New(o)
+  o = o or {}
+  setmetatable(o, self)
+  self.__index = self
+  return o
+end
     
-function  buffer:Add(key)
+function buffer:Add(key)
   if telemetry[key] ~= nil then
     if getTime() - self.time > self.delta * 100 then
       self.time = getTime()
@@ -103,147 +213,73 @@ end
 
 ----------------------------------------------------------------------
 -- heading offset
-local headingOffset = 0  
+local heading = {}
+  heading["offset"] = 0  
 
-----------------------------------------------------------------------
--- mathematical utility function
-local function round(value, decimal)
-  local exponent = 10^(decimal or 0)
-  return math.floor(value * exponent + 0.5) / exponent
-end
-
-----------------------------------------------------------------------
--- display value with name and unit
-local function displayValue(x, y, key, font, offset)
+function heading:Get(key)
   if telemetry[key] ~= nil then
-    if offset == nil then
-      offset = 0
-    end      
-    lcd.drawText(x, y, telemetry[key].name .. ": " .. round(telemetry[key].data - offset, 2) .. telemetry[key].unit, font)
-  end
-end
-
--- display channel value as name  
-local function displayKey(x, y, key, value, font)
-  if telemetry[key] ~= nil then
-    if telemetry[key].data == value then
-      lcd.drawText(x, y, telemetry[key].unit, font)
-    end
-  end
-end
-
--- display gauge from min to max value, catch if value is lower than min 
-local function displayGauge(x, y, w, h, key, border, norm, factor)
-  if telemetry[key] ~= nil then
-    if norm == nil then
-      norm = 1
-    end
-    if factor == nil then
-      factor = 1
-    end
-    if telemetry[key].data / norm >= border["max"] then
-      lcd.drawFilledRectangle(x, y, w, h, SOLID)
-    elseif telemetry[key].data / norm >= border["min"] then
-      lcd.drawGauge(x, y, w, h, (telemetry[key].data / norm - border["min"]) * factor , (border["max"] - border["min"]) * factor)
-    else
-      lcd.drawRectangle(x, y, w, h)
-    end
-  end
-end
-
--- display timer with name
-local function displayTimer(x, y, key, font)
-  if telemetry[key] ~= nil then
-    lcd.drawText(x, y, telemetry[key].name .. ": ", font)
-    lcd.drawTimer(lcd.getLastPos(), y, telemetry[key].data, font)
-    return 1
+    self.offset = telemetry[key].data
   else
-    return -1
+    self.offset = 0
   end
 end
 
--- overall screen display, will call separate screen
-local function displayScreen(screenDisplay) 
-  local flightMode = ( { getFlightMode() } )[2]
-  local modelName = model.getInfo().name
-      
-  lcd.drawScreenTitle(modelName .. "  (" .. battery["cels"] .. "S)  " .. flightMode .. " - " .. version, screenDisplay, #screen)
-  screen[screenDisplay]()
+function heading:Set(value)
+  self.offset = value
 end
 
--- display diagram
-local function displayDiagram(values)
-  local max = values:Max()
-    
-  for index = 1, #values - 1, 1 do
-    lcd.drawLine(index, 50, index, 10 + 40 * (1 - values[index] / max), SOLID,GREY_DEFAULT)
-    lcd.drawPoint(index, 10 + 40 * (1 - values[index] / max), SOLID, FORCE)
-  end
-  
-  lcd.drawLine(1,10,1,50,SOLID, FORCE)
-  lcd.drawLine(1,50,#values,50,SOLID, FORCE)
-  
-end
-
+----------------------------------------------------------------------
 -- define different screens, to add screens increment number, do NOT leave a number out
+local screen = {}
+  screen["num"] = 1
+  
+function screen:Next()
+  self.num = self.num + 1
+  if self.num > #self then
+    self.num = 1
+  end
+end
+
+function screen:Previous()
+  self.num = self.num - 1
+  if self.num < 1 then
+    self.num = #self
+  end
+end
+
 screen[1] = function() 
-  displayValue(1, 9, "VFAS", MIDSIZE)
-  displayGauge(107, 9, 100, 12, "VFAS", battery, battery["cels"], 100)
-  displayValue(1, 25, "RSSI", MIDSIZE)
-  displayGauge(107, 25, 100, 12, "RSSI", rssi)
-  displayValue(107, 41, "Hdg", MIDSIZE, headingOffset)
-  displayKey(1, 41, "ch13", 1024, MIDSIZE+INVERS+BLINK)
-  displayKey(1, 56, "ch6", 0, SMLSIZE)
-  displayKey(1+display["width"]/4, 56, "ch7", 0, SMLSIZE)
-  displayKey(1+display["width"]/2, 56, "ch8", 0 , SMLSIZE)
-  displayKey(1+display["width"]*3/4, 56, "ch11", 0, SMLSIZE)
+  display:Value(1, 9, "VFAS", MIDSIZE)
+  display:Gauge(107, 9, 100, 12, "VFAS", battery, battery["cels"], 100)
+  display:Value(1, 25, "RSSI", MIDSIZE)
+  display:Gauge(107, 25, 100, 12, "RSSI", rssi)
+  display:Value(107, 41, "Hdg", MIDSIZE, heading.offset)
+  display:Key(1, 41, "ch13", 1024, MIDSIZE+INVERS+BLINK)
+  display:Key(1, 56, "ch6", 0, SMLSIZE)
+  display:Key(1+display["width"]/4, 56, "ch7", 0, SMLSIZE)
+  display:Key(1+display["width"]/2, 56, "ch8", 0 , SMLSIZE)
+  display:Key(1+display["width"]*3/4, 56, "ch11", 0, SMLSIZE)
 end
 
 screen[2] = function() 
-  displayValue(1, 9,  "Alt", MIDSIZE)
-  displayValue(107, 9,  "Alt+", SMLSIZE)
-  displayValue(107, 17,  "Alt-", SMLSIZE)
-  displayValue(1, 25, "VSpd", MIDSIZE)
-  displayValue(107, 25, "VSpd+", SMLSIZE)
-  displayValue(107, 33, "VSpd-", SMLSIZE)
-  displayTimer(107, 41, "timer1", MIDSIZE)
-  displayKey(1, 41, "ch13", 1024, MIDSIZE+INVERS+BLINK)
-  displayKey(1, 56, "ch6", 0, SMLSIZE)
-  displayKey(1+display["width"]/4, 56, "ch7", 0, SMLSIZE)
-  displayKey(1+display["width"]/2, 56, "ch8", 0 , SMLSIZE)
-  displayKey(1+display["width"]*3/4, 56, "ch11", 0, SMLSIZE)
+  display:Value(1, 9,  "Alt", MIDSIZE)
+  display:Value(107, 9,  "Alt+", SMLSIZE)
+  display:Value(107, 17,  "Alt-", SMLSIZE)
+  display:Value(1, 25, "VSpd", MIDSIZE)
+  display:Value(107, 25, "VSpd+", SMLSIZE)
+  display:Value(107, 33, "VSpd-", SMLSIZE)
+  display:Timer(107, 41, "timer1", MIDSIZE)
+  display:Key(1, 41, "ch13", 1024, MIDSIZE+INVERS+BLINK)
+  display:Key(1, 56, "ch6", 0, SMLSIZE)
+  display:Key(1+display["width"]/4, 56, "ch7", 0, SMLSIZE)
+  display:Key(1+display["width"]/2, 56, "ch8", 0 , SMLSIZE)
+  display:Key(1+display["width"]*3/4, 56, "ch11", 0, SMLSIZE)
 end
 
 screen[3] = function() 
-  displayDiagram(buffer)
+  display:Diagram(altitude)
 end
 
 -- sound funtions, to be played as well in the background
-local function checkBattery(key, value, file)
-	local cellVoltage
-
-  if telemetry[key] ~= nil then
-    cellVoltage = telemetry[key].data / battery["cels"]
-	  if cellVoltage <= battery[value] then
-		  if battery.flag[value] ~= true then
-		    if battery.time[value] == nil then
-		      battery.time[value] = 0
-		    end
-		    if battery.delta[value] == nil then
-		      battery.delta[value] = 0
-		    end
-	   	  if getTime() - battery.time[value] > battery.delta[value] * 100 then
-          battery.flag[value] = true
-			    playFile(file)
-			  end
-		  end
-	  elseif cellVoltage > battery[value] then
-  		battery.flag[value] = false
-  	  battery.time[value] = getTime()
-	  end
-  end
-end
-
 local function playSound(key, value, file)
   if telemetry[key] ~= nil then
     if telemetry[key].data == value then
@@ -252,15 +288,6 @@ local function playSound(key, value, file)
         playFile(file)
       end
     end
-  end
-end
-
--- offset calculation
-local function getOffset(key)
-  if telemetry[key] ~= nil then
-    return telemetry[key].data
-  else
-    return 0
   end
 end
 
@@ -278,6 +305,7 @@ end
 local function init_func()
   -- init_func is called once when model is loaded  
   initTable() 
+  altitude = buffer:New()
 end
 
 local function bg_func()
@@ -307,10 +335,10 @@ local function bg_func()
   playSound("ch13", 1024, "thract.wav")
   playSound("ch13", -1024, "thrdis.wav")
 
-  checkBattery("VFAS", "low", "batlow.wav")
-  checkBattery("VFAS", "critical", "batcrit.wav")  
+  battery:Check("VFAS", "low", "batlow.wav")
+  battery:Check("VFAS", "critical", "batcrit.wav")  
   
-  buffer:Add("Alt")
+  altitude:Add("Alt")
 end
 
 local function run_func(event)
@@ -320,39 +348,30 @@ local function run_func(event)
   lcd.clear()
     
   if event == EVT_ENTER_BREAK then  
-    headingOffset = getOffset("Hdg")
+    heading:Get("Hdg")
   end  
   
   if event == EVT_EXIT_BREAK then  
-    headingOffset = 0
+    heading:Set(0)
   end  
 
   if event == EVT_PLUS_BREAK then
-    battery["cels"] = battery["cels"] + 1
+    battery:Increment()
   end
   
   if event == EVT_MINUS_BREAK then
-    battery["cels"] = battery["cels"] - 1
-    if battery["cels"] < 1 then
-      battery["cels"] = 1
-    end
+    battery:Decrement()
   end
   
   if event == EVT_PAGE_BREAK then
-    screenDisplay = screenDisplay + 1
-    if screenDisplay > #screen then
-      screenDisplay = 1
-    end
+    screen:Next()
   end
   
   if event == EVT_PAGE_LONG then
-    screenDisplay = screenDisplay - 1
-    if screenDisplay < 1 then
-      screenDisplay = #screen
-    end
+    screen:Previous()
   end
     
-  displayScreen(screenDisplay)
+  display:Show(screen)
 end
 
 return { run=run_func, background=bg_func, init=init_func  }
