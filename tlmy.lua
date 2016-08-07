@@ -3,20 +3,21 @@
   
   Date: 27.07.2016
   Author: wolfgang.keller@wobilix.de
+  HW: frsky taranis plus X9d
+  SW: open-tx 2.1.8
   
   ToDo:
-    - flughöhen Diagram
   
 ]]--
 
 ----------------------------------------------------------------------
 -- Version String
-local version = "v0.11.3" 
+local version = "v0.11.4" 
 
 ----------------------------------------------------------------------
--- telemetry tables
--- the '-' and '+' at the end of some keys force to fill the table this way
-local telemetry = {} -- telemetry and unit
+-- telemetry table
+-- can be adjusted according to own display needs
+local telemetry = {} -- 'telemetry shortcut' = 'unit'
   telemetry["VFAS"] = "V"
   telemetry["Alt"] = "m"
   telemetry["Alt-"] = "m"
@@ -35,9 +36,11 @@ local telemetry = {} -- telemetry and unit
   telemetry["ch13"] = "arm"
 
 ----------------------------------------------------------------------
--- battery limits, can be changed on personal needs
+-- battery limits and functions
+-- low and critical are lipo limits
+-- delta.low and delta.critical are timers to wait before alarming
 local battery = {}
-  battery["cels"] = 3
+  battery["cels"] = 3               -- can be adjusted
   battery["min"] = 3.2
   battery["critical"] = 3.3
   battery["low"] = 3.5
@@ -45,8 +48,8 @@ local battery = {}
   battery["flag"] = {}
   battery["time"] = {}
   battery["delta"] = {}
-  battery["delta"]["low"] = 10
-  battery["delta"]["critical"] = 5
+  battery["delta"]["low"] = 10      -- can be adjusted
+  battery["delta"]["critical"] = 5  -- can be adjusted
   
 function battery:Increment()
   self.cels = self.cels + 1
@@ -85,7 +88,7 @@ function battery:Check(key, value, file)
 end
   
 ----------------------------------------------------------------------
--- rssi limits, critical and ow vale are copied from radio
+-- rssi limits, critical and low value are copied from radio
 local rssi = {}
   rssi["min"] = 40
   rssi["critical"] = 42
@@ -100,7 +103,8 @@ local function round(value, decimal)
 end  
 
 ----------------------------------------------------------------------
--- dislay size for reciever
+-- dislay size for reciever display
+-- depending on the receiver
 local display = {}
   display["width"] = 212
   display["height"] = 64 
@@ -150,16 +154,20 @@ function display:Timer(x, y, key, font)
   end
 end
 
-function display:Diagram(values)
-  local max = values:Max()
-    
+function display:Diagram(values, x, y, h)
+  local min, max = values:MinMax()
+      
+  lcd.drawText(x + 2, y, values.key .. " " .. round(max, 2) .. "/" .. round(min, 2), SMLSIZE)
+
   for index = 1, #values - 1, 1 do
-    lcd.drawLine(index, 50, index, 10 + 40 * (1 - values[index] / max), SOLID,GREY_DEFAULT)
-    lcd.drawPoint(index, 10 + 40 * (1 - values[index] / max), SOLID, FORCE)
+    if max ~= 0 then
+      lcd.drawLine(x + index, y + h, x + index, y + h * (1 - values[index] / max), SOLID,GREY_DEFAULT)
+      lcd.drawPoint(x + index, y + h * (1 - values[index] / max), SOLID, FORCE)
+    end
   end
   
-  lcd.drawLine(1,10,1,50,SOLID, FORCE)
-  lcd.drawLine(1,50,#values,50,SOLID, FORCE)
+  lcd.drawLine(x, y, x, y + h, SOLID, FORCE)
+  lcd.drawLine(x, y + h, x + values.length, y + h, SOLID, FORCE)
 end
 
 function display:Show(screen) 
@@ -173,10 +181,12 @@ end
 ----------------------------------------------------------------------
 -- ring buffer
 local buffer = {}
-  buffer["maxLength"] = 100
+  buffer["length"] = 100    -- can be adjusted
   buffer["maxValue"] = 0
+  buffer["minValue"] = 0
   buffer["time"] = 0
   buffer["delta"] = 1
+  buffer["key"] = "key"
   
 function buffer:New(o)
   o = o or {}
@@ -185,30 +195,34 @@ function buffer:New(o)
   return o
 end
     
-function buffer:Add(key)
-  if telemetry[key] ~= nil then
+function buffer:Add()
+  if telemetry[self.key] ~= nil then
     if getTime() - self.time > self.delta * 100 then
       self.time = getTime()
-      for index = self.maxLength, 2, -1 do
+      for index = self.length, 2, -1 do
         if self[index - 1] ~= nil then
           self[index] = self[index - 1]
         else
           self[index] = nil
         end
       end
-      self[1] = telemetry[key].data  
+      self[1] = telemetry[self.key].data  
     end 
   end
 end
 
-function buffer:Max()
+function buffer:MinMax()
   self.maxValue = self[1]
+  self.minValue = self[1]
   for index = 1, #self - 1, 1 do
     if self[index] > self.maxValue then
       self.maxValue = self[index]
     end
+    if self[index] < self.minValue then
+      self.minValue = self[index]
+    end
   end
-  return self.maxValue
+  return self.minValue, self.maxValue
 end
 
 ----------------------------------------------------------------------
@@ -224,14 +238,14 @@ function heading:Get(key)
   end
 end
 
-function heading:Set(value)
+function heading:SetOffset(value)
   self.offset = value
 end
 
 ----------------------------------------------------------------------
--- define different screens, to add screens increment number, do NOT leave a number out
+-- define different screens, to add screens increment number in [], do NOT leave a number out
 local screen = {}
-  screen["num"] = 1
+  screen["num"] = 1   -- can be adjusted
   
 function screen:Next()
   self.num = self.num + 1
@@ -276,10 +290,11 @@ screen[2] = function()
 end
 
 screen[3] = function() 
-  display:Diagram(altitude)
+  display:Diagram(altitude, 1, 10, 40)
 end
 
--- sound funtions, to be played as well in the background
+----------------------------------------------------------------------
+-- sound triggered by value
 local function playSound(key, value, file)
   if telemetry[key] ~= nil then
     if telemetry[key].data == value then
@@ -291,6 +306,8 @@ local function playSound(key, value, file)
   end
 end
 
+----------------------------------------------------------------------
+-- initalize telemetry table 
 local function initTable()
   for key, value in pairs(telemetry) do
     telemetry[key] = getFieldInfo(key)
@@ -301,11 +318,11 @@ local function initTable()
   end 
 end
 
--- skeleton funtions
+----------------------------------------------------------------------
 local function init_func()
   -- init_func is called once when model is loaded  
   initTable() 
-  altitude = buffer:New()
+  altitude = buffer:New{ key = "Alt", length = 105, delta = 1 } -- can be modified, put telemetry 'Alt' every 1 sec into a table with 105 values
 end
 
 local function bg_func()
@@ -338,7 +355,7 @@ local function bg_func()
   battery:Check("VFAS", "low", "batlow.wav")
   battery:Check("VFAS", "critical", "batcrit.wav")  
   
-  altitude:Add("Alt")
+  altitude:Add()
 end
 
 local function run_func(event)
@@ -352,7 +369,7 @@ local function run_func(event)
   end  
   
   if event == EVT_EXIT_BREAK then  
-    heading:Set(0)
+    heading:SetOffset(0)
   end  
 
   if event == EVT_PLUS_BREAK then
