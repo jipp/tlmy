@@ -7,17 +7,45 @@
   SW: open-tx 2.1.8
   
   ToDo:
+    - hight warning
   
 ]]--
 
 ----------------------------------------------------------------------
 -- Version String
-local version = "v0.11.4" 
+local version = "v0.12.0" 
 
 ----------------------------------------------------------------------
 -- telemetry table
--- can be adjusted according to own display needs
-local telemetry = {} -- 'telemetry shortcut' = 'unit'
+-- can be adjusted according to own display need
+local tlmy = {}
+ 
+function tlmy:New(o)
+  o = o or {}
+  setmetatable(o, self)
+  self.__index = self
+  return o
+end
+
+function tlmy:Init()
+  for key, value in pairs(self) do
+    self[key] = getFieldInfo(key)
+    if self[key] ~= nil then  
+      self[key].unit = value
+      self[key].data = ""
+    end
+  end 
+end
+
+function tlmy:Refresh()
+  for key, value in pairs(self) do
+    if self[key] ~= nil then
+      self[key].data = getValue(self[key].id)
+    end
+  end
+end
+
+local telemetry = tlmy:New{}  -- 'telemetry shortcut' = 'unit'
   telemetry["VFAS"] = "V"
   telemetry["Alt"] = "m"
   telemetry["Alt-"] = "m"
@@ -33,7 +61,7 @@ local telemetry = {} -- 'telemetry shortcut' = 'unit'
   telemetry["ch7"] = "air"
   telemetry["ch8"] = "beeper"
   telemetry["ch11"] = "gtune"
-  telemetry["ch13"] = "arm"
+  telemetry["ch13"] = "arm"  
 
 ----------------------------------------------------------------------
 -- battery limits and functions
@@ -104,7 +132,6 @@ end
 
 ----------------------------------------------------------------------
 -- dislay size for reciever display
--- depending on the receiver
 local display = {}
   display["width"] = 212
   display["height"] = 64 
@@ -156,8 +183,8 @@ end
 
 function display:Diagram(values, x, y, h)
   local min, max = values:MinMax()
-      
-  lcd.drawText(x + 2, y, values.key .. " " .. round(max, 2) .. "/" .. round(min, 2), SMLSIZE)
+  
+  lcd.drawText(x + 2, y, values.key .. " " .. round(values[1], 2) .. "/" .. round(max, 2) .. "/" .. round(min, 2), SMLSIZE)
 
   for index = 1, #values - 1, 1 do
     if max ~= 0 then
@@ -225,22 +252,32 @@ function buffer:MinMax()
   return self.minValue, self.maxValue
 end
 
+local altitude = buffer:New{ key = "Alt", length = 105, delta = 1 } -- can be modified, put telemetry 'Alt' every 1 sec into a table with 105 values
+
 ----------------------------------------------------------------------
 -- heading offset
-local heading = {}
-  heading["offset"] = 0  
+local offset = {}
+  offset["key"] = "Hdg"
+  offset["offset"] = 0
 
-function heading:Get(key)
-  if telemetry[key] ~= nil then
-    self.offset = telemetry[key].data
-  else
-    self.offset = 0
+function offset:New(o)
+  o = o or {}
+  setmetatable(o, self)
+  self.__index = self
+  return o
+end
+
+function offset:SetOffset()
+  if telemetry[self.key] ~= nil then
+    self.offset = telemetry[self.key].data
   end
 end
 
-function heading:SetOffset(value)
-  self.offset = value
+function offset:EraseOffset()
+  self.offset = 0
 end
+
+local heading = offset:New{ key = "Hdg" }
 
 ----------------------------------------------------------------------
 -- define different screens, to add screens increment number in [], do NOT leave a number out
@@ -307,31 +344,14 @@ local function playSound(key, value, file)
 end
 
 ----------------------------------------------------------------------
--- initalize telemetry table 
-local function initTable()
-  for key, value in pairs(telemetry) do
-    telemetry[key] = getFieldInfo(key)
-    if telemetry[key] ~= nil then  
-      telemetry[key].unit = value
-      telemetry[key].data = ""
-    end
-  end 
-end
-
-----------------------------------------------------------------------
 local function init_func()
   -- init_func is called once when model is loaded  
-  initTable() 
-  altitude = buffer:New{ key = "Alt", length = 105, delta = 1 } -- can be modified, put telemetry 'Alt' every 1 sec into a table with 105 values
+  telemetry:Init()
 end
 
 local function bg_func()
   -- bg_func is called periodically when screen is not visible
-  for key, value in pairs(telemetry) do
-    if telemetry[key] ~= nil then
-      telemetry[key].data = getValue(telemetry[key].id)
-    end
-  end
+  telemetry:Refresh() -- somehow is not working
   
   playSound("ch5", 1024, "acromd.wav")
   playSound("ch5", 0, "hrznmd.wav")
@@ -365,11 +385,11 @@ local function run_func(event)
   lcd.clear()
     
   if event == EVT_ENTER_BREAK then  
-    heading:Get("Hdg")
+    heading:EraseOffset()
   end  
   
   if event == EVT_EXIT_BREAK then  
-    heading:SetOffset(0)
+    heading:SetOffset()
   end  
 
   if event == EVT_PLUS_BREAK then
