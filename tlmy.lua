@@ -8,12 +8,11 @@
   
   ToDo:
     - hight warning
-  
 ]]--
 
 ----------------------------------------------------------------------
 -- Version String
-local version = "v0.12.2" 
+local version = "v0.12.4" 
 
 ----------------------------------------------------------------------
 -- mathematical utility function
@@ -23,7 +22,7 @@ local function round(value, decimal)
 end  
 
 ----------------------------------------------------------------------
--- gauge limits
+-- gauge limits and functions
 local gauge = {}
   gauge["min"] = 1
   gauge["max"] = 1
@@ -49,9 +48,9 @@ function gauge:Decrement()
 end
 
 ----------------------------------------------------------------------
--- ring buffer
+-- ring buffer limits and functions
 local buffer = {}
-  buffer["length"] = 100    -- can be adjusted
+  buffer["length"] = 100
   buffer["maxValue"] = 0
   buffer["minValue"] = 0
   buffer["time"] = 0
@@ -145,6 +144,7 @@ function battery:Decrement()
 end
 
 ----------------------------------------------------------------------
+-- channel limits and functions
 local channel = {}
   channel["key"] = "key"
  
@@ -159,28 +159,71 @@ function channel:getName()
   local value = getValue(self.key)
   
   if value ~= nil then 
-    for key, position in pairs(self) do
-      if value == position then
-        return key
+    for index, data in ipairs(self) do
+      if data.position == value then
+        return data.name
+      end
+    end
+  end
+end
+
+function channel:Play()
+  local value = getValue(self.key)
+  
+  if value ~= nil then
+    for index, data in ipairs(self) do
+      if data.position == value then
+        if self.flag ~= value then 
+          self.flag = value
+          if data.file ~= nil then
+            playFile(data.file)
+          end
+        end
       end
     end
   end
 end
 
 ----------------------------------------------------------------------
+-- local defenitions
 local rssi = gauge:New{ min = 40, max = 100 }
 local vfas = gauge:New{ min = 3.2, max =  4.3, factor = 3, smooth = 100 }
-local altitude = buffer:New{ key = "Alt", length = 105, delta = 1 } -- can be modified, put telemetry 'Alt' every 1 sec into a table with 105 values
+local altitude = buffer:New{ key = "Alt", length = 105, delta = 1 }
 local vfasLow = battery:New{ limit = 3.5, delta = 10, key = "VFAS", file = "batlow.wav" }
 local vfasCritical = battery:New{ limit = 3.3, delta = 5, key = "VFAS", file = "batcrit.wav" }
-local ch6 = channel:New{ key = "ch6", baro = 0 }
-local ch7 = channel:New{ key = "ch7", air = 0 }
-local ch8 = channel:New{ key = "ch8", beeper = 0 }
-local ch11 = channel:New{ key = "ch11", gtune = 0 }
-local ch13 = channel:New{ key = "ch13", arm = 1024 } 
+
+local ch5 = channel:New{ key = "ch5", 
+  { name = "acromd", position = 1024, file = "acromd.wav" },
+  { name = "hrznmd", position = 0, file = "hrznmd.wav" },
+  { name = "anglmd", position = -1024, file = "anglmd.wav" }
+}
+local ch6 = channel:New{ key = "ch6", 
+  { position = -1024, file = "brmtrof.wav" }, 
+  { name = "baro", position = 0, file = "brmtr.wav" },
+  { position = 1024, file = "brmtrof.wav" } 
+}
+local ch7 = channel:New{ key = "ch7", 
+  { position = -1024 },
+  { name = "air", position = 0, file = "bombawy.wav" },
+  { position = 1024 }
+}
+local ch8 = channel:New{ key = "ch8", 
+  { position = -1024},
+  { name = "beeper", position = 0},
+  { position = 1024},
+}
+local ch11 = channel:New{ key = "ch11", 
+  { position = -1024 },
+  { name = "gtune", position = 0, file = "automd.wav" },
+  { position = 1024 }
+}
+local ch13 = channel:New{ key = "ch13", 
+  { name = "arm", position = 1024, file = "thract.wav" },
+  { position = -1024, file = "thrdis.wav" }
+}
 
 ----------------------------------------------------------------------
--- dislay size for reciever display
+-- dislay limits and functions
 local display = {}
   display["width"] = 212
   display["height"] = 64 
@@ -252,7 +295,7 @@ end
 ----------------------------------------------------------------------
 -- define different screens, to add screens increment number in [], do NOT leave a number out
 local screen = {}
-  screen["num"] = 1   -- can be adjusted
+  screen["num"] = 1
   
 function screen:Next()
   self.num = self.num + 1
@@ -300,18 +343,6 @@ screen[3] = function()
   display:Diagram(altitude, 1, 10, 40)
 end
 
---------------
-local function playSound(key, value, file)
-  if telemetry[key] ~= nil then
-    if telemetry[key].data == value then
-      if telemetry[key].sound ~= value then
-        telemetry[key].sound = value
-        playFile(file)
-      end
-    end
-  end
-end
-
 ----------------------------------------------------------------------
 local function init_func()
   -- init_func is called once when model is loaded   
@@ -322,6 +353,11 @@ local function bg_func()
   altitude:Add()
   vfasLow:Check()  
   vfasCritical:Check()  
+  ch5:Play()
+  ch6:Play()
+  ch7:Play()
+  ch11:Play()
+  ch13:Play()
 end
 
 local function run_func(event)
