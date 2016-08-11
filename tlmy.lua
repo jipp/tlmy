@@ -12,7 +12,7 @@
 
 ----------------------------------------------------------------------
 -- Version String
-local version = "v0.12.4" 
+local version = "v0.12.5" 
 
 ----------------------------------------------------------------------
 -- mathematical utility function
@@ -285,7 +285,7 @@ function display:Diagram(values, x, y, h)
   diff = max - min
 
   for index = 1, #values, 1 do
-    if max ~= 0 then
+    if diff ~= 0 then
       lcd.drawLine(x + index, y + h * max / diff, 
         x + index, y + h * (max - values[index]) / diff, 
         SOLID,GREY_DEFAULT)
@@ -297,9 +297,15 @@ function display:Diagram(values, x, y, h)
   lcd.drawLine(x, y, 
     x, y + h, 
     SOLID, FORCE)
-  lcd.drawLine(x, y + h * max / diff, 
-    x + values.length, y + h * max / diff, 
-    SOLID, FORCE)
+  if diff ~= 0 then
+    lcd.drawLine(x, y + h * max / diff, 
+      x + values.length, y + h * max / diff, 
+      SOLID, FORCE)
+  else
+    lcd.drawLine(x, y + h, 
+      x + values.length, y + h, 
+      SOLID, FORCE)
+  end    
 end
 
 function display:Show(screen) 
