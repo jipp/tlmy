@@ -4,7 +4,7 @@
   Date: 27.07.2016
   Author: wolfgang.keller@wobilix.de
   HW: frsky taranis plus X9d
-  SW: open-tx 2.1.8
+  SW: open-tx 2.1.9
   
   ToDo:
     - hight warning
@@ -185,10 +185,11 @@ function channel:Play()
 end
 
 ----------------------------------------------------------------------
--- local defenitions
+-- local definitions
 local rssi = gauge:New{ min = 40, max = 100 }
 local vfas = gauge:New{ min = 3.2, max =  4.3, factor = 3, smooth = 100 }
-local altitude = buffer:New{ key = "Alt", length = 105, delta = 1 }
+local altitude = buffer:New{ key = "Alt", length = 102, delta = 1 }
+local verticalSpeed = buffer:New{ key = "VSpd", length = 102, delta = 1 }
 local vfasLow = battery:New{ limit = 3.5, delta = 10, key = "VFAS", file = "batlow.wav" }
 local vfasCritical = battery:New{ limit = 3.3, delta = 5, key = "VFAS", file = "batcrit.wav" }
 
@@ -270,18 +271,35 @@ end
 
 function display:Diagram(values, x, y, h)
   local min, max = values:MinMax()
+  local diff = 0
   
   lcd.drawText(x + 2, y, values.key .. " " .. round(values[1], 2) .. "/" .. round(max, 2) .. "/" .. round(min, 2), SMLSIZE)
 
-  for index = 1, #values - 1, 1 do
+  if min > 0 then
+    min = 0
+  end
+  if max < 0 then
+    max = 0
+  end
+
+  diff = max - min
+
+  for index = 1, #values, 1 do
     if max ~= 0 then
-      lcd.drawLine(x + index, y + h, x + index, y + h * (1 - values[index] / max), SOLID,GREY_DEFAULT)
-      lcd.drawPoint(x + index, y + h * (1 - values[index] / max), SOLID, FORCE)
+      lcd.drawLine(x + index, y + h * max / diff, 
+        x + index, y + h * (max - values[index]) / diff, 
+        SOLID,GREY_DEFAULT)
+      lcd.drawPoint(x + index, y + h * (max - values[index]) / diff, 
+        SOLID, FORCE)
     end
   end
   
-  lcd.drawLine(x, y, x, y + h, SOLID, FORCE)
-  lcd.drawLine(x, y + h, x + values.length, y + h, SOLID, FORCE)
+  lcd.drawLine(x, y, 
+    x, y + h, 
+    SOLID, FORCE)
+  lcd.drawLine(x, y + h * max / diff, 
+    x + values.length, y + h * max / diff, 
+    SOLID, FORCE)
 end
 
 function display:Show(screen) 
@@ -341,6 +359,7 @@ end
 
 screen[3] = function() 
   display:Diagram(altitude, 1, 10, 40)
+  display:Diagram(verticalSpeed, 107, 10, 40)
 end
 
 ----------------------------------------------------------------------
@@ -351,6 +370,7 @@ end
 local function bg_func()
   -- bg_func is called periodically when screen is not visible
   altitude:Add()
+  verticalSpeed:Add()
   vfasLow:Check()  
   vfasCritical:Check()  
   ch5:Play()
