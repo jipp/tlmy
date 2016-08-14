@@ -12,7 +12,7 @@
 
 ----------------------------------------------------------------------
 -- Version String
-local version = "v0.12.5" 
+local version = "v0.12.6" 
 
 ----------------------------------------------------------------------
 -- mathematical utility function
@@ -22,12 +22,101 @@ local function round(value, decimal)
 end  
 
 ----------------------------------------------------------------------
--- gauge limits and functions
+-- ring buffer
+local diagram = {}
+  diagram["length"] = 100
+  diagram["maxValue"] = 0
+  diagram["minValue"] = 0
+  diagram["time"] = 0
+  diagram["delta"] = 1
+  diagram["key"] = "key"
+  
+function diagram:New(o)
+  o = o or {}
+  setmetatable(o, self)
+  self.__index = self
+  return o
+end
+    
+function diagram:Add()
+  local value = getValue(self.key)
+  
+  if value ~= nil then
+    if getTime() - self.time > self.delta * 100 then
+      self.time = getTime()
+      for index = self.length, 2, -1 do
+        if self.buffer[index - 1] ~= nil then
+          self.buffer[index] = self.buffer[index - 1]
+        else
+          self.buffer[index] = nil
+        end
+      end
+      self.buffer[1] = value  
+    end 
+  end
+end
+
+function diagram:MinMax()
+  local maxValue = self[1]
+  local minValue = self[1]
+  for index = 1, #self.buffer - 1, 1 do
+    if self.buffer[index] > self.maxValue then
+      self.maxValue = self.buffer[index]
+    end
+    if self.buffer[index] < self.minValue then
+      self.minValue = self.buffer[index]
+    end
+  end
+  return minValue, maxValue
+end
+
+function diagram:Show(x, y, h)
+  local min, max = self.MinMax()
+  local diff = 0
+  
+  lcd.drawText(x + 2, y, self.key .. " " .. round(self[1], 2) .. "/" .. round(max, 2) .. "/" .. round(min, 2), SMLSIZE)
+
+  if min > 0 then
+    min = 0
+  end
+  if max < 0 then
+    max = 0
+  end
+
+  diff = max - min
+
+  for index = 1, #self, 1 do
+    if diff ~= 0 then
+      lcd.drawLine(x + index, y + h * max / diff, 
+        x + index, y + h * (max - self[index]) / diff, 
+        SOLID,GREY_DEFAULT)
+      lcd.drawPoint(x + index, y + h * (max - self[index]) / diff, 
+        SOLID, FORCE)
+    end
+  end
+  
+  lcd.drawLine(x, y, 
+    x, y + h, 
+    SOLID, FORCE)
+  if diff ~= 0 then
+    lcd.drawLine(x, y + h * max / diff, 
+      x + self.length, y + h * max / diff, 
+      SOLID, FORCE)
+  else
+    lcd.drawLine(x, y + h, 
+      x + self.length, y + h, 
+      SOLID, FORCE)
+  end    
+end
+
+----------------------------------------------------------------------
+-- gauge
 local gauge = {}
   gauge["min"] = 1
   gauge["max"] = 1
   gauge["factor"] = 1
   gauge["smooth"] = 1
+  gauge["key"] = "key"
  
 function gauge:New(o)
   o = o or {}
@@ -47,57 +136,43 @@ function gauge:Decrement()
   end
 end
 
-----------------------------------------------------------------------
--- ring buffer limits and functions
-local buffer = {}
-  buffer["length"] = 100
-  buffer["maxValue"] = 0
-  buffer["minValue"] = 0
-  buffer["time"] = 0
-  buffer["delta"] = 1
-  buffer["key"] = "key"
+function gauge:Show(x, y, w, h)
+  local value = getValue(self.key)
   
-function buffer:New(o)
+  if value ~= nil then
+    if value >= self.max * self.factor then
+      lcd.drawFilledRectangle(x, y, w, h, SOLID)
+    elseif value >= self.min * self.factor then
+      lcd.drawGauge(x, y, w, h, (value - self.min * self.factor) * self.smooth, (self.max - self.min) * self.factor * self.smooth)
+    else
+      lcd.drawRectangle(x, y, w, h)
+    end
+  end
+end
+
+----------------------------------------------------------------------
+-- Value
+local value = {}
+  value["key"] = "key"
+ 
+function value:New(o)
   o = o or {}
   setmetatable(o, self)
   self.__index = self
   return o
 end
-    
-function buffer:Add()
+
+function value:Show(x, y, font)
   local value = getValue(self.key)
   
   if value ~= nil then
-    if getTime() - self.time > self.delta * 100 then
-      self.time = getTime()
-      for index = self.length, 2, -1 do
-        if self[index - 1] ~= nil then
-          self[index] = self[index - 1]
-        else
-          self[index] = nil
-        end
-      end
-      self[1] = value  
-    end 
+    lcd.drawText(x, y, self.key .. ": ", font)
+    lcd.drawChannel(lcd.getLastPos(), y, self.key, font+ LEFT)
   end
-end
-
-function buffer:MinMax()
-  self.maxValue = self[1]
-  self.minValue = self[1]
-  for index = 1, #self - 1, 1 do
-    if self[index] > self.maxValue then
-      self.maxValue = self[index]
-    end
-    if self[index] < self.minValue then
-      self.minValue = self[index]
-    end
-  end
-  return self.minValue, self.maxValue
 end
 
 ----------------------------------------------------------------------
--- battery limits and functions
+-- battery
 local battery = {}
   battery["cels"] = 3
   battery["limit"] = 1
@@ -184,12 +259,38 @@ function channel:Play()
   end
 end
 
+function channel:ShowName(x, y, font)
+  local value = self:getName()
+   
+  if value ~= nil then
+    lcd.drawText(x, y, value, font)
+  end
+end
+
+function channel:ShowValue(x, y, font)
+  local value = getValue(self.key)
+  
+  if value ~= nil then
+    lcd.drawText(x, y, self.key .. ": ", font)
+    lcd.drawChannel(lcd.getLastPos(), y, self.key, font+ LEFT)
+  end
+end
+
 ----------------------------------------------------------------------
 -- local definitions
-local rssi = gauge:New{ min = 40, max = 100 }
-local vfas = gauge:New{ min = 3.2, max =  4.3, factor = 3, smooth = 100 }
-local altitude = buffer:New{ key = "Alt", length = 102, delta = 1 }
-local verticalSpeed = buffer:New{ key = "VSpd", length = 102, delta = 1 }
+local rssiGauge = gauge:New{ key = "RSSI", min = 40, max = 100 }
+local vfasGauge = gauge:New{ key = "VFAS", min = 3.2, max =  4.3, factor = 3, smooth = 100 }
+local altitudeDiagram = diagram:New{ key = "Alt", length = 102, delta = 1 }
+local vfasValue = value:New{ key = "VFAS"}
+local rssiValue = value:New{ key = "RSSI"}
+local hdgValue = value:New{ key = "Hdg"}
+local altValue = value:New{ key = "Alt"}
+local altPlusValue = value:New{ key = "Alt+"}
+local altMinusValue = value:New{ key = "Alt-"}
+local vspdValue = value:New{ key = "VSpd"}
+local vspdPlusValue = value:New{ key = "VSpd+"}
+local vspdMinusValue = value:New{ key = "VSpd-"}
+
 local vfasLow = battery:New{ limit = 3.5, delta = 10, key = "VFAS", file = "batlow.wav" }
 local vfasCritical = battery:New{ limit = 3.3, delta = 5, key = "VFAS", file = "batcrit.wav" }
 
@@ -219,7 +320,7 @@ local ch11 = channel:New{ key = "ch11",
   { position = 1024 }
 }
 local ch13 = channel:New{ key = "ch13", 
-  { name = "arm", position = 1024, file = "thract.wav" },
+  { name = "armed", position = 1024, file = "thract.wav" },
   { position = -1024, file = "thrdis.wav" }
 }
 
@@ -238,28 +339,6 @@ function display:Channel(x, y, key, font)
   end
 end
 
-function display:Name(x, y, channel, font)
-  local value = channel:getName()
-   
-  if value ~= nil then
-    lcd.drawText(x, y, value, font)
-  end
-end
-
-function display:Gauge(x, y, w, h, key, border)
-  local value = getValue(key)
-  
-  if value ~= nil then
-    if value >= border["max"] * border["factor"] then
-      lcd.drawFilledRectangle(x, y, w, h, SOLID)
-    elseif value >= border["min"] * border["factor"] then
-      lcd.drawGauge(x, y, w, h, (value - border["min"] * border["factor"]) * border["smooth"], (border["max"] - border["min"]) * border["factor"] * border["smooth"])
-    else
-      lcd.drawRectangle(x, y, w, h)
-    end
-  end
-end
-
 function display:Timer(x, y, key, font)
   local value = getValue(key)
   
@@ -267,45 +346,6 @@ function display:Timer(x, y, key, font)
     lcd.drawText(x, y, key .. ": ", font)
     lcd.drawTimer(lcd.getLastPos(), y, value, font)
   end
-end
-
-function display:Diagram(values, x, y, h)
-  local min, max = values:MinMax()
-  local diff = 0
-  
-  lcd.drawText(x + 2, y, values.key .. " " .. round(values[1], 2) .. "/" .. round(max, 2) .. "/" .. round(min, 2), SMLSIZE)
-
-  if min > 0 then
-    min = 0
-  end
-  if max < 0 then
-    max = 0
-  end
-
-  diff = max - min
-
-  for index = 1, #values, 1 do
-    if diff ~= 0 then
-      lcd.drawLine(x + index, y + h * max / diff, 
-        x + index, y + h * (max - values[index]) / diff, 
-        SOLID,GREY_DEFAULT)
-      lcd.drawPoint(x + index, y + h * (max - values[index]) / diff, 
-        SOLID, FORCE)
-    end
-  end
-  
-  lcd.drawLine(x, y, 
-    x, y + h, 
-    SOLID, FORCE)
-  if diff ~= 0 then
-    lcd.drawLine(x, y + h * max / diff, 
-      x + values.length, y + h * max / diff, 
-      SOLID, FORCE)
-  else
-    lcd.drawLine(x, y + h, 
-      x + values.length, y + h, 
-      SOLID, FORCE)
-  end    
 end
 
 function display:Show(screen) 
@@ -336,36 +376,35 @@ function screen:Previous()
 end
 
 screen[1] = function() 
-  display:Channel(1, 9, "VFAS", MIDSIZE)
-  display:Gauge(107, 9, 100, 12, "VFAS", vfas)
-  display:Channel(1, 25, "RSSI", MIDSIZE)
-  display:Gauge(107, 25, 100, 12, "RSSI", rssi)
-  display:Channel(107, 41, "Hdg", MIDSIZE)
-  display:Name(1, 41, ch13, MIDSIZE+INVERS+BLINK)
-  display:Name(1, 56, ch6, SMLSIZE)
-  display:Name(1+display["width"]/4, 56, ch7, SMLSIZE)
-  display:Name(1+display["width"]/2, 56, ch8, SMLSIZE)
-  display:Name(1+display["width"]*3/4, 56, ch11, SMLSIZE)
+  vfasValue:Show(1, 9, MIDSIZE)
+  vfasGauge:Show(107, 9, 100, 12)
+  rssiValue:Show(1, 25, MIDSIZE)
+  rssiGauge:Show(107, 25, 100, 12)
+  hdgValue:Show(107, 41, MIDSIZE)
+  ch13:ShowName(1, 41, MIDSIZE+INVERS+BLINK)
+  ch6:ShowName(1, 56, SMLSIZE)
+  ch7:ShowName(1+display["width"]/4, 56, SMLSIZE)
+  ch8:ShowName(1+display["width"]/2, 56, SMLSIZE)
+  ch11:ShowName(1+display["width"]*3/4, 56, SMLSIZE)
 end
 
 screen[2] = function() 
-  display:Channel(1, 9, "Alt", MIDSIZE)
-  display:Channel(107, 9, "Alt+", SMLSIZE)
-  display:Channel(107, 17, "Alt-", SMLSIZE)
-  display:Channel(1, 25, "VSpd", MIDSIZE)
-  display:Channel(107, 25, "VSpd+", SMLSIZE)
-  display:Channel(107, 33, "VSpd-", SMLSIZE)
+  altValue:Show(1, 9, MIDSIZE)
+  altPlusValue:Show(107, 9, SMLSIZE)
+  altMinusValue:Show(107, 17, SMLSIZE)
+  vspdValue:Show(1, 25, MIDSIZE)
+  vspdPlusValue:Show(107, 25, SMLSIZE)
+  vspdMinusValue:Show(107, 33, SMLSIZE)
   display:Timer(107, 41, "timer1", MIDSIZE)
-  display:Name(1, 41, ch13, MIDSIZE+INVERS+BLINK)
-  display:Name(1, 56, ch6, SMLSIZE)
-  display:Name(1+display["width"]/4, 56, ch7, SMLSIZE)
-  display:Name(1+display["width"]/2, 56, ch8, SMLSIZE)
-  display:Name(1+display["width"]*3/4, 56, ch11, SMLSIZE)
+  ch13:ShowName(1, 41, MIDSIZE+INVERS+BLINK)
+  ch6:ShowName(1, 56, SMLSIZE)
+  ch7:ShowName(1+display["width"]/4, 56, SMLSIZE)
+  ch8:ShowName(1+display["width"]/2, 56, SMLSIZE)
+  ch11:ShowName(1+display["width"]*3/4, 56, SMLSIZE)
 end
 
 screen[3] = function() 
-  display:Diagram(altitude, 1, 10, 40)
-  display:Diagram(verticalSpeed, 107, 10, 40)
+  altitudeDiagram:Show(1, 10, 40)
 end
 
 ----------------------------------------------------------------------
@@ -375,8 +414,8 @@ end
 
 local function bg_func()
   -- bg_func is called periodically when screen is not visible
-  altitude:Add()
-  verticalSpeed:Add()
+  -- altitude:Add()
+  -- verticalSpeed:Add()
   vfasLow:Check()  
   vfasCritical:Check()  
   ch5:Play()
