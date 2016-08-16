@@ -9,12 +9,12 @@
 
 ----------------------------------------------------------------------
 -- Version String
-local version = "v0.13.0" 
+local version = "v0.13.1"
 
 ----------------------------------------------------------------------
 -- mathematical utility function
 ----------------------------------------------------------------------
-local function round(value, decimal)
+local function Round(value, decimal)
   local exponent = 10^(decimal or 0)
   return math.floor(value * exponent + 0.5) / exponent
 end  
@@ -22,7 +22,7 @@ end
 ----------------------------------------------------------------------
 -- Wrapper
 ----------------------------------------------------------------------
-function showValue(x, y, key, font)
+function ShowValue(x, y, key, font)
   local value = getValue(key)
   
   if value ~= nil then
@@ -31,7 +31,7 @@ function showValue(x, y, key, font)
   end
 end
 
-function showTimer(x, y, key, font)
+function ShowTimer(x, y, key, font)
   local value = getValue(key)
   
   if value ~= nil then
@@ -40,7 +40,7 @@ function showTimer(x, y, key, font)
   end
 end
 
-function showGauge(x, y, w, h, key)
+function ShowGauge(x, y, w, h, key)
   local value = getValue(key.key)
   
   if value ~= nil then
@@ -128,7 +128,7 @@ function diagram:Show(x, y, h)
   local min, max = self:MinMax()
   local diff = 0
   
-  lcd.drawText(x + 2, y, self.key .. " " .. round(self[1], 2) .. "/" .. round(max, 2) .. "/" .. round(min, 2), SMLSIZE)
+  lcd.drawText(x + 2, y, self.key .. " " .. Round(self[1], 2) .. "/" .. Round(max, 2) .. "/" .. Round(min, 2), SMLSIZE)
 
   if min > 0 then
     min = 0
@@ -174,7 +174,7 @@ function switch:New(o)
   return o
 end
 
-function switch:getName()
+function switch:GetName()
   local value = getValue(self.key)
   
   if value ~= nil then 
@@ -187,7 +187,7 @@ function switch:getName()
 end
 
 function switch:Show(x, y, font)
-  local value = self:getName()
+  local value = self:GetName()
    
   if value ~= nil then
     lcd.drawText(x, y, value, font)
@@ -209,18 +209,18 @@ function lipo:New(o)
   return o
 end
 
-function lipo:increment()
+function lipo:Increment()
   self.cels = self.cels + 1
 end
 
-function lipo:decrement()
+function lipo:Decrement()
   self.cels = self.cels - 1
   if self.cels < 1 then
     self.cels = 1
   end
 end
 
-function lipo:check()
+function lipo:Check()
   local value = getValue(self.key) / self.cels
 
   if value ~= nil then
@@ -314,11 +314,11 @@ function screen:Previous()
 end
 
 screen[1] = function() 
-  showValue(1, 9, "VFAS", MIDSIZE)
-  showGauge(107, 9, 100, 12, vfasGauge)
-  showValue(1, 25, "RSSI", MIDSIZE)
-  showGauge(107, 25, 100, 12, rssiGauge)
-  showValue(107, 41, "Hdg", MIDSIZE)
+  ShowValue(1, 9, "VFAS", MIDSIZE)
+  ShowGauge(107, 9, 100, 12, vfasGauge)
+  ShowValue(1, 25, "RSSI", MIDSIZE)
+  ShowGauge(107, 25, 100, 12, rssiGauge)
+  ShowValue(107, 41, "Hdg", MIDSIZE)
   ch13:Show(1, 41, MIDSIZE+INVERS+BLINK)
   ch6:Show(1, 56, SMLSIZE)
   ch7:Show(1+display["width"]/4, 56, SMLSIZE)
@@ -328,12 +328,12 @@ end
 
 screen[2] = function() 
   altDiagram:Show(1, 10, 40)
-  showValue(107, 9, "Alt", SMLSIZE)
-  showValue(107, 17, "Alt+", SMLSIZE)
-  showValue(107, 25, "Alt-", SMLSIZE)
-  showValue(107, 33, "VSpd", SMLSIZE)
-  showValue(107, 41, "VSpd+", SMLSIZE)
-  showValue(107, 49, "VSpd-", SMLSIZE)
+  ShowValue(107, 9, "Alt", SMLSIZE)
+  ShowValue(107, 17, "Alt+", SMLSIZE)
+  ShowValue(107, 25, "Alt-", SMLSIZE)
+  ShowValue(107, 33, "VSpd", SMLSIZE)
+  ShowValue(107, 41, "VSpd+", SMLSIZE)
+  ShowValue(107, 49, "VSpd-", SMLSIZE)
 end
 
 ----------------------------------------------------------------------
@@ -344,7 +344,7 @@ end
 local function bg_func()
   -- bg_func is called periodically when screen is not visible
   altDiagram:Add()
-  energy:check()
+  energy:Check()
 end
 
 local function run_func(event)
@@ -354,11 +354,11 @@ local function run_func(event)
   lcd.clear()
     
   if event == EVT_PLUS_BREAK then
-    energy:increment()
+    energy:Increment()
   end
   
   if event == EVT_MINUS_BREAK then
-    energy:decrement()
+    energy:Decrement()
   end
   
   if event == EVT_PAGE_BREAK then
