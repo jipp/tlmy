@@ -4,7 +4,7 @@
   Date: 27.07.2016
   Author: wolfgang.keller@wobilix.de
   HW: frsky taranis plus X9d
-  SW: open-tx 2.1.9
+  SW: open-tx 2.1.8
 ]]--
 
 ----------------------------------------------------------------------
@@ -194,7 +194,6 @@ function switch:Show(x, y, font)
   end
 end
 
-----------------------------------------------------------------------
 ---- LiPo
 local lipo = {}
   lipo["key"] = "VFAS"
