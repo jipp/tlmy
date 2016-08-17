@@ -12,3 +12,10 @@ flight controller: SP3 Racing EVO
 
 ## Info
 the telemetry values are based on cleanflight SP3 Racing EVO controller
+
+## Pictures
+# Page 1/2
+![Page 1/2](tlmy1_2.png)
+
+# Page 2/2
+![Page 2/2](tlmy2_2.png)
