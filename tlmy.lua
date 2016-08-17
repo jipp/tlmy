@@ -3,8 +3,8 @@
   
   Date: 27.07.2016
   Author: wolfgang.keller@wobilix.de
-  HW: frsky taranis plus X9d
-  SW: open-tx 2.1.8
+  HW: FrSky Taranis X9D Plus
+  SW: OpenTX 2.1.8
 ]]--
 
 ----------------------------------------------------------------------
@@ -66,7 +66,7 @@ end
 local gauge = {}
   gauge["key"] = "key"
   gauge["min"] = 1
-  gauge["max"] = 1
+  gauge["max"] = 100
   gauge["factor"] = 1
   gauge["smooth"] = 1
  
@@ -141,11 +141,8 @@ function diagram:Show(x, y, h)
 
   for index = 1, #self, 1 do
     if diff ~= 0 then
-      lcd.drawLine(x + index, y + h * max / diff, 
-        x + index, y + h * (max - self[index]) / diff, 
-        SOLID,GREY_DEFAULT)
-      lcd.drawPoint(x + index, y + h * (max - self[index]) / diff, 
-        SOLID, FORCE)
+      lcd.drawLine(x + index, y + h * max / diff, x + index, y + h * (max - self[index]) / diff, SOLID,GREY_DEFAULT)
+      lcd.drawPoint(x + index, y + h * (max - self[index]) / diff, SOLID, FORCE)
     end
   end
   
@@ -153,13 +150,9 @@ function diagram:Show(x, y, h)
     x, y + h, 
     SOLID, FORCE)
   if diff ~= 0 then
-    lcd.drawLine(x, y + h * max / diff, 
-      x + self.length, y + h * max / diff, 
-      SOLID, FORCE)
+    lcd.drawLine(x, y + h * max / diff, x + self.length, y + h * max / diff, SOLID, FORCE)
   else
-    lcd.drawLine(x, y + h, 
-      x + self.length, y + h, 
-      SOLID, FORCE)
+    lcd.drawLine(x, y + h, x + self.length, y + h, SOLID, FORCE)
   end    
 end
 
@@ -196,7 +189,7 @@ end
 
 ---- LiPo
 local lipo = {}
-  lipo["key"] = "VFAS"
+  lipo["key"] = "key"
   lipo["min"] = 3.2
   lipo["max"] = 4.3
   lipo["cels"] = 3
@@ -246,39 +239,39 @@ end
 -- local definitions
 ----------------------------------------------------------------------
 local energy = lipo:New{ key = "VFAS", 
-  { limit = 3.3, delta = 10,  file = "batcrit.wav" }, 
-  { limit = 3.5, delta = 10,  file = "batlow.wav" }
+  { limit = 3.3, delta = 10, file = "batcrit.wav" }, 
+  { limit = 3.5, delta = 10, file = "batlow.wav" }
 }
 local rssiGauge = gauge:New{ key = "RSSI", min = 40, max = 100 }
 local vfasGauge = gauge:New{ key = "VFAS", min = energy.min, max =  energy.max, factor = function () return energy.cels end, smooth = 100 }
 local altDiagram = diagram:New{ key = "Alt" }
 local ch6 = switch:New{ key = "ch6", 
   { position = -1024, }, 
-  { name = "baro", position = 0 },
+  { position = 0, name = "baro" },
   { position = 1024 } 
 }
 local ch7 = switch:New{ key = "ch7", 
   { position = -1024 },
-  { name = "air", position = 0 },
+  { position = 0, name = "air" },
   { position = 1024 }
 }
 local ch8 = switch:New{ key = "ch8", 
   { position = -1024},
-  { name = "beeper", position = 0},
+  { position = 0, name = "beeper" },
   { position = 1024},
 }
 local ch11 = switch:New{ key = "ch11", 
   { position = -1024 },
-  { name = "gtune", position = 0 },
+  { position = 0, name = "gtune" },
   { position = 1024 }
 }
 local ch13 = switch:New{ key = "ch13", 
-  { name = "armed", position = 1024 },
+  { position = 1024, name = "armed" },
   { position = -1024 }
 }
 
 ----------------------------------------------------------------------
--- dislay limits and functions
+-- display
 ----------------------------------------------------------------------
 local display = {}
   display["width"] = 212

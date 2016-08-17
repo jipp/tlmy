@@ -8,7 +8,7 @@ flight controller: SP3 Racing EVO
 * copy script into the TELEMETRY folder on the SD card
 
 ## Additional configuration
-* the script allows to adjust the amount of cells using +/- inany screen
+* the script allows to adjust the amount of cells using +/- in any screen
 
 ## Info
 the telemetry values are based on cleanflight SP3 Racing EVO controller
