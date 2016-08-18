@@ -13,6 +13,8 @@ SP3 Racing EVO
 ## Info
 * the telemetry values are based on cleanflight SP3 Racing EVO controller
 * in case a telemetry value is not available it will not be displayed
+* it is possible to display as well named switch positions
+* low and critical battery status is announced
 
 ## Pictures
 * Page 1/2:
