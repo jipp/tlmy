@@ -14,11 +14,14 @@ SP3 Racing EVO
 * the telemetry values are based on cleanflight SP3 Racing EVO controller
 * in case a telemetry value is not available it will not be displayed
 * it is possible to display as well named switch positions
-* low and critical battery status is announced
+* low and critical battery status is announced via voice
+* non available telemetry values are not displayed and ignored
 
 ## Pictures
 * Page 1/2:
+display of VFAS and RSSI. In addition named switch positions and arm status
 ![Page 1/2](tlmy1_2.png)
 
 * Page 2/2:
+display of  altitude (1 sec interval calibration). alt and vspd incl. the min and max values. The diagram shows the as well the min and max value of the displayed graph
 ![Page 2/2](tlmy2_2.png)
