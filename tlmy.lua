@@ -9,10 +9,11 @@
 
 ----------------------------------------------------------------------
 -- Version String
-local version = "v0.13.1"
+----------------------------------------------------------------------
+local version = "v0.13.2"
 
 ----------------------------------------------------------------------
--- mathematical utility function
+-- Mathematical Utility Function
 ----------------------------------------------------------------------
 local function Round(value, decimal)
   local exponent = 10^(decimal or 0)
@@ -22,7 +23,7 @@ end
 ----------------------------------------------------------------------
 -- Wrapper
 ----------------------------------------------------------------------
-function ShowValue(x, y, key, font)
+local function ShowValue(x, y, key, font)
   local value = getValue(key)
   
   if value ~= nil then
@@ -31,7 +32,7 @@ function ShowValue(x, y, key, font)
   end
 end
 
-function ShowTimer(x, y, key, font)
+local function ShowTimer(x, y, key, font)
   local value = getValue(key)
   
   if value ~= nil then
@@ -40,7 +41,7 @@ function ShowTimer(x, y, key, font)
   end
 end
 
-function ShowGauge(x, y, w, h, key)
+local function ShowGauge(x, y, w, h, key)
   local value = getValue(key.key)
   
   if value ~= nil then
@@ -141,7 +142,7 @@ function diagram:Show(x, y, h)
 
   for index = 1, #self, 1 do
     if diff ~= 0 then
-      lcd.drawLine(x + index, y + h * max / diff, x + index, y + h * (max - self[index]) / diff, SOLID,GREY_DEFAULT)
+      lcd.drawLine(x + index, y + h * max / diff, x + index, y + h * (max - self[index]) / diff, SOLID, GREY_DEFAULT)
       lcd.drawPoint(x + index, y + h * (max - self[index]) / diff, SOLID, FORCE)
     end
   end
