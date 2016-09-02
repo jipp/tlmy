@@ -10,7 +10,7 @@
 ----------------------------------------------------------------------
 -- Version String
 ----------------------------------------------------------------------
-local version = "v0.13.2"
+local version = "v0.13.3"
 
 ----------------------------------------------------------------------
 -- Mathematical Utility Function
@@ -253,8 +253,8 @@ local ch6 = switch:New{ key = "ch6",
 }
 local ch7 = switch:New{ key = "ch7", 
   { position = -1024 },
-  { position = 0, name = "air" },
-  { position = 1024 }
+  { position = 0, name = "osd sw" },
+  { position = 1024, name = "air mode" }
 }
 local ch8 = switch:New{ key = "ch8", 
   { position = -1024},
