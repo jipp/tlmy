@@ -10,7 +10,7 @@
 ----------------------------------------------------------------------
 -- Version String
 ----------------------------------------------------------------------
-local version = "v0.13.3"
+local version = "v0.13.4"
 
 ----------------------------------------------------------------------
 -- Mathematical Utility Function
@@ -84,6 +84,7 @@ local diagram = {}
   diagram["length"] = 102
   diagram["time"] = 0
   diagram["delta"] = 1
+  diagram["variance"] = 50
   
 function diagram:New(o)
   o = o or {}
@@ -105,7 +106,11 @@ function diagram:Add()
           self[index] = nil
         end
       end
-      self[1] = value  
+      if (self[2] ~= nil) and (math.abs(value - self[2]) > self["variance"]) then
+          self[1] = self[2]
+      else
+        self[1] = value
+      end  
     end 
   end
 end
@@ -188,7 +193,7 @@ function switch:Show(x, y, font)
   end
 end
 
----- LiPo
+-- LiPo
 local lipo = {}
   lipo["key"] = "key"
   lipo["min"] = 3.2
@@ -245,7 +250,7 @@ local energy = lipo:New{ key = "VFAS",
 }
 local rssiGauge = gauge:New{ key = "RSSI", min = 40, max = 100 }
 local vfasGauge = gauge:New{ key = "VFAS", min = energy.min, max =  energy.max, factor = function () return energy.cels end, smooth = 100 }
-local altDiagram = diagram:New{ key = "Alt" }
+local altDiagram = diagram:New{ key = "Alt", delta = "1" }
 local ch6 = switch:New{ key = "ch6", 
   { position = -1024, }, 
   { position = 0, name = "baro" },
@@ -257,9 +262,14 @@ local ch7 = switch:New{ key = "ch7",
   { position = 1024, name = "air mode" }
 }
 local ch8 = switch:New{ key = "ch8", 
-  { position = -1024},
+  { position = -1024 },
   { position = 0, name = "beeper" },
-  { position = 1024},
+  { position = 1024 },
+}
+local ch9 = switch:New{ key = "ch9", 
+  { position = -1024 },
+  { position = 0 },
+  { position = 1024 },
 }
 local ch11 = switch:New{ key = "ch11", 
   { position = -1024 },
@@ -314,9 +324,10 @@ screen[1] = function()
   ShowValue(107, 41, "Hdg", MIDSIZE)
   ch13:Show(1, 41, MIDSIZE+INVERS+BLINK)
   ch6:Show(1, 56, SMLSIZE)
-  ch7:Show(1+display["width"]/4, 56, SMLSIZE)
-  ch8:Show(1+display["width"]/2, 56, SMLSIZE)
-  ch11:Show(1+display["width"]*3/4, 56, SMLSIZE)
+  ch7:Show(1+display["width"]*1/5, 56, SMLSIZE)
+  ch8:Show(1+display["width"]*2/5, 56, SMLSIZE)
+  ch9:Show(1+display["width"]*3/5, 56, SMLSIZE)
+  ch11:Show(1+display["width"]*4/5, 56, SMLSIZE)
 end
 
 screen[2] = function() 
