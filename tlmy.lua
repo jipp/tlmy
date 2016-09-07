@@ -10,7 +10,6 @@
 ----------------------------------------------------------------------
 -- Version String
 ----------------------------------------------------------------------
-local version = "v0.13.4"
 
 ----------------------------------------------------------------------
 -- Mathematical Utility Function
@@ -84,7 +83,7 @@ local diagram = {}
   diagram["length"] = 102
   diagram["time"] = 0
   diagram["delta"] = 1
-  diagram["variance"] = 50
+  diagram["extreme"] = 500
   
 function diagram:New(o)
   o = o or {}
@@ -95,6 +94,7 @@ end
     
 function diagram:Add()
   local value = getValue(self.key)
+  local diff = 0
   
   if value ~= nil then
     if getTime() - self.time > self.delta * 100 then
@@ -106,11 +106,13 @@ function diagram:Add()
           self[index] = nil
         end
       end
-      if (self[2] ~= nil) and (math.abs(value - self[2]) > self["variance"]) then
-          self[1] = self[2]
+	  
+      if (self[2] ~= nil) and (math.abs(value - self[2]) > self["extreme"]) then
+        self[1] = self[2]
       else
         self[1] = value
       end  
+	  
     end 
   end
 end
@@ -134,7 +136,7 @@ function diagram:Show(x, y, h)
   local min, max = self:MinMax()
   local diff = 0
   
-  lcd.drawText(x + 2, y, self.key .. " " .. Round(self[1], 2) .. "/" .. Round(max, 2) .. "/" .. Round(min, 2), SMLSIZE)
+  lcd.drawText(x + 3, y, self.key .. " " .. Round(self[1], 2) .. "/" .. Round(max, 2) .. "/" .. Round(min, 2), SMLSIZE)
 
   if min > 0 then
     min = 0
@@ -152,14 +154,18 @@ function diagram:Show(x, y, h)
     end
   end
   
-  lcd.drawLine(x, y, 
-    x, y + h, 
-    SOLID, FORCE)
+  lcd.drawLine(x, y, x, y + h, SOLID, FORCE)
+  lcd.drawLine(x - 1, y + 1, x + 1, y + 1, SOLID, FORCE)
+	
   if diff ~= 0 then
     lcd.drawLine(x, y + h * max / diff, x + self.length, y + h * max / diff, SOLID, FORCE)
+    lcd.drawLine(x + self.length - 1, y + h * max / diff - 1, x + self.length - 1, y + h * max / diff + 1, SOLID, FORCE)
   else
     lcd.drawLine(x, y + h, x + self.length, y + h, SOLID, FORCE)
+    lcd.drawLine(x + self.length - 1, y + h - 1, x + self.length - 1, y + h + 1, SOLID, FORCE)
   end    
+  
+  lcd.drawText(x + 3, y + h + 2 , "I=" .. self["delta"] .. "s", SMLSIZE)
 end
 
 -- Switch
@@ -250,7 +256,7 @@ local energy = lipo:New{ key = "VFAS",
 }
 local rssiGauge = gauge:New{ key = "RSSI", min = 40, max = 100 }
 local vfasGauge = gauge:New{ key = "VFAS", min = energy.min, max =  energy.max, factor = function () return energy.cels end, smooth = 100 }
-local altDiagram = diagram:New{ key = "Alt", delta = "1" }
+local altDiagram = diagram:New{ key = "Alt", delta = 1, extreme = 100 }
 local ch6 = switch:New{ key = "ch6", 
   { position = -1024, }, 
   { position = 0, name = "baro" },
@@ -324,20 +330,21 @@ screen[1] = function()
   ShowValue(107, 41, "Hdg", MIDSIZE)
   ch13:Show(1, 41, MIDSIZE+INVERS+BLINK)
   ch6:Show(1, 56, SMLSIZE)
-  ch7:Show(1+display["width"]*1/5, 56, SMLSIZE)
-  ch8:Show(1+display["width"]*2/5, 56, SMLSIZE)
-  ch9:Show(1+display["width"]*3/5, 56, SMLSIZE)
-  ch11:Show(1+display["width"]*4/5, 56, SMLSIZE)
+  ch7:Show(1 + display["width"] * 1 / 5, 56, SMLSIZE)
+  ch8:Show(1 + display["width"] * 2 / 5, 56, SMLSIZE)
+  ch9:Show(1 + display["width"] * 3 / 5, 56, SMLSIZE)
+  ch11:Show(1 + display["width"] * 4 / 5, 56, SMLSIZE)
 end
 
 screen[2] = function() 
-  altDiagram:Show(1, 10, 40)
-  ShowValue(107, 9, "Alt", SMLSIZE)
-  ShowValue(107, 17, "Alt+", SMLSIZE)
-  ShowValue(107, 25, "Alt-", SMLSIZE)
-  ShowValue(107, 33, "VSpd", SMLSIZE)
-  ShowValue(107, 41, "VSpd+", SMLSIZE)
-  ShowValue(107, 49, "VSpd-", SMLSIZE)
+  ShowValue(1, 9, "Alt", MIDSIZE)
+  altDiagram:Show(107, 9, 38)
+  ch13:Show(1, 41, MIDSIZE+INVERS+BLINK)
+  ch6:Show(1, 56, SMLSIZE)
+  ch7:Show(1 + display["width"] * 1 / 5, 56, SMLSIZE)
+  ch8:Show(1 + display["width"] * 2 / 5, 56, SMLSIZE)
+  ch9:Show(1 + display["width"] * 3 / 5, 56, SMLSIZE)
+  ch11:Show(1 + display["width"] * 4 / 5, 56, SMLSIZE)
 end
 
 ----------------------------------------------------------------------
