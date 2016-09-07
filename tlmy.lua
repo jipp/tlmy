@@ -10,6 +10,7 @@
 ----------------------------------------------------------------------
 -- Version String
 ----------------------------------------------------------------------
+local version = "v0.13.6"
 
 ----------------------------------------------------------------------
 -- Mathematical Utility Function
@@ -165,7 +166,7 @@ function diagram:Show(x, y, h)
     lcd.drawLine(x + self.length - 1, y + h - 1, x + self.length - 1, y + h + 1, SOLID, FORCE)
   end    
   
-  lcd.drawText(x + 3, y + h + 2 , "I=" .. self["delta"] .. "s", SMLSIZE)
+  lcd.drawText(x + self.length - 25, y + h + 2 , "I=" .. self["delta"] .. "s", SMLSIZE)
 end
 
 -- Switch
