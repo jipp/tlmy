@@ -10,7 +10,7 @@
 ----------------------------------------------------------------------
 -- Version String
 ----------------------------------------------------------------------
-local version = "v0.13.6"
+local version = "v0.14.1"
 
 ----------------------------------------------------------------------
 -- Mathematical Utility Function
@@ -248,6 +248,36 @@ function lipo:Check()
   end
 end
 
+-- correction
+local correction = {}
+   correction["key"] = "key"
+   correction["factor"] = 0
+  
+function correction:New(o)
+  o = o or {}
+  setmetatable(o, self)
+  self.__index = self
+  return o
+end
+
+function correction:Show(x, y, font)
+  local value = getValue(self.key)
+  
+  if value ~= nil then
+    lcd.drawText(x, y, self.key .. ": ", font)
+    lcd.drawNumber(lcd.getLastPos(), y, (value - self.factor) * 100, font+PREC2+LEFT)
+    lcd.drawText(lcd.getLastPos(), y, " aligned", font)
+  end
+end
+
+function correction:Reset()
+  local value = getValue(self.key)
+  
+  if value ~= nil then
+    self.factor = value
+  end  
+end
+
 ----------------------------------------------------------------------
 -- local definitions
 ----------------------------------------------------------------------
@@ -287,6 +317,7 @@ local ch13 = switch:New{ key = "ch13",
   { position = 1024, name = "armed" },
   { position = -1024 }
 }
+local heading = correction:New{ key = "Hdg" }
 
 ----------------------------------------------------------------------
 -- display
@@ -328,7 +359,8 @@ screen[1] = function()
   ShowGauge(107, 9, 100, 12, vfasGauge)
   ShowValue(1, 25, "RSSI", MIDSIZE)
   ShowGauge(107, 25, 100, 12, rssiGauge)
-  ShowValue(107, 41, "Hdg", MIDSIZE)
+  ShowValue(107, 41, "Hdg", SMLSIZE)
+  heading:Show(107, 49, SMLSIZE)
   ch13:Show(1, 41, MIDSIZE+INVERS+BLINK)
   ch6:Show(1, 56, SMLSIZE)
   ch7:Show(1 + display["width"] * 1 / 5, 56, SMLSIZE)
@@ -379,6 +411,10 @@ local function run_func(event)
   
   if event == EVT_PAGE_LONG then
     screen:Previous()
+  end
+  
+  if event == EVT_ENTER_BREAK then
+    heading:Reset()
   end
     
   display:Show(screen)
