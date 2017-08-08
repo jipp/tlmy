@@ -1,7 +1,7 @@
 --[[
   tlmy.lua
 
-  Date: 27.07.2016
+  Date: 06.08.2017
   Author: wolfgang.keller@wobilix.de
   HW: FrSky Taranis X9D Plus
   SW: OpenTX 2.1.8; OpenTX 2.2.0
@@ -205,7 +205,6 @@ local lipo = {}
   lipo["key"] = "key"
   lipo["min"] = 3.3
   lipo["max"] = 4.3
-  lipo["cels"] = 3
 
 function lipo:New(o)
   o = o or {}
@@ -214,19 +213,8 @@ function lipo:New(o)
   return o
 end
 
-function lipo:Increment()
-  self.cels = self.cels + 1
-end
-
-function lipo:Decrement()
-  self.cels = self.cels - 1
-  if self.cels < 1 then
-    self.cels = 1
-  end
-end
-
 function lipo:Check()
-  local value = getValue(self.key) / self.cels
+  local value = getValue(self.key)
 
   if value ~= nil then
     for index, data in ipairs(self) do
@@ -246,6 +234,16 @@ function lipo:Check()
       end
     end
   end
+end
+
+function lipo:getCels(key)
+  local value = ""
+
+  if getValue(key) ~=0 and getValue(self.key) ~= 0  then
+    value = math.floor(getValue(key) / getValue(self.key) + 0.5)
+  end
+
+  return value
 end
 
 -- correction
@@ -281,12 +279,12 @@ end
 ----------------------------------------------------------------------
 -- local definitions
 ----------------------------------------------------------------------
-local energy = lipo:New{ key = "VFAS",
-  { limit = 3.3, delta = 10, file = "batcrit.wav" },
-  { limit = 3.5, delta = 10, file = "batlow.wav" }
+local energy = lipo:New{ key = "A4",
+  { limit = 3.3, delta = 10, file = "lowbat.wav" },
+  { limit = 3.5, delta = 10, file = "lowbat.wav" }
 }
 local rssiGauge = gauge:New{ key = "RSSI", min = 40, max = 100 }
-local vfasGauge = gauge:New{ key = "VFAS", min = energy.min, max =  energy.max, factor = function () return energy.cels end, smooth = 100 }
+local energyGauge = gauge:New{ key = "A4", min = energy.min, max =  energy.max, smooth = 100 }
 local altDiagram = diagram:New{ key = "Alt", delta = 1, extreme = 100 }
 local ch6 = switch:New{ key = "ch6",
   { position = -1024, },
@@ -301,11 +299,6 @@ local ch7 = switch:New{ key = "ch7",
 local ch8 = switch:New{ key = "ch8",
   { position = -1024 },
   { position = 0, name = "beeper" },
-  { position = 1024 },
-}
-local ch9 = switch:New{ key = "ch9",
-  { position = -1024 },
-  { position = 0 },
   { position = 1024 },
 }
 local ch13 = switch:New{ key = "ch13",
@@ -325,7 +318,7 @@ function display:Show(screen)
   local flightMode = ( { getFlightMode() } )[2]
   local modelName = model.getInfo().name
 
-  lcd.drawScreenTitle(modelName .. "  (" .. energy.cels .. "S)  " .. flightMode .. " - " .. version, screen.num, #screen)
+  lcd.drawScreenTitle(modelName .. "  (" .. energy:getCels("VFAS") .. "S)  " .. flightMode .. " - " .. version, screen.num, #screen)
   screen[screen.num]()
 end
 
@@ -351,7 +344,7 @@ end
 
 screen[1] = function()
   ShowValue(1, 9, "VFAS", MIDSIZE)
-  ShowGauge(107, 9, 100, 12, vfasGauge)
+  ShowGauge(107, 9, 100, 12, energyGauge)
   ShowValue(1, 25, "RSSI", MIDSIZE)
   ShowGauge(107, 25, 100, 12, rssiGauge)
   ShowValue(107, 41, "Hdg", SMLSIZE)
@@ -360,7 +353,7 @@ screen[1] = function()
   ch6:Show(1, 56, SMLSIZE)
   ch7:Show(1 + display["width"] * 1 / 5, 56, SMLSIZE)
   ch8:Show(1 + display["width"] * 2 / 5, 56, SMLSIZE)
-  ch9:Show(1 + display["width"] * 3 / 5, 56, SMLSIZE)
+  ShowTimer(1 + display["width"] * 3 / 5, 56, "timer1", SMLSIZE)
 end
 
 screen[2] = function()
@@ -370,7 +363,6 @@ screen[2] = function()
   ch6:Show(1, 56, SMLSIZE)
   ch7:Show(1 + display["width"] * 1 / 5, 56, SMLSIZE)
   ch8:Show(1 + display["width"] * 2 / 5, 56, SMLSIZE)
-  ch9:Show(1 + display["width"] * 3 / 5, 56, SMLSIZE)
 end
 
 ----------------------------------------------------------------------
@@ -389,14 +381,6 @@ local function run_func(event)
   bg_func() -- run typically calls bg_func to start
 
   lcd.clear()
-
-  if event == EVT_PLUS_BREAK then
-    energy:Increment()
-  end
-
-  if event == EVT_MINUS_BREAK then
-    energy:Decrement()
-  end
 
   if event == EVT_PAGE_BREAK then
     screen:Next()
