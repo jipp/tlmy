@@ -363,6 +363,7 @@ screen[2] = function()
   ch6:Show(1, 56, SMLSIZE)
   ch7:Show(1 + display["width"] * 1 / 5, 56, SMLSIZE)
   ch8:Show(1 + display["width"] * 2 / 5, 56, SMLSIZE)
+  ShowTimer(1 + display["width"] * 3 / 5, 56, "timer1", SMLSIZE)
 end
 
 ----------------------------------------------------------------------
