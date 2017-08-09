@@ -10,7 +10,7 @@
 ----------------------------------------------------------------------
 -- Version String
 ----------------------------------------------------------------------
-local version = "v0.15.0"
+local version = "v0.15.1"
 
 ----------------------------------------------------------------------
 -- Mathematical Utility Function
@@ -236,7 +236,7 @@ function lipo:Check()
   end
 end
 
-function lipo:getCels(key)
+function lipo:GetCels(key)
   local value = ""
 
   if getValue(key) ~=0 and getValue(self.key) ~= 0  then
@@ -318,7 +318,7 @@ function display:Show(screen)
   local flightMode = ( { getFlightMode() } )[2]
   local modelName = model.getInfo().name
 
-  lcd.drawScreenTitle(modelName .. "  (" .. energy:getCels("VFAS") .. "S)  " .. flightMode .. " - " .. version, screen.num, #screen)
+  lcd.drawScreenTitle(modelName .. "  (" .. energy:GetCels("VFAS") .. "S)  " .. flightMode .. " - " .. version, screen.num, #screen)
   screen[screen.num]()
 end
 
