@@ -15,7 +15,7 @@ local version = "v0.16.0"
 ----------------------------------------------------------------------
 -- Mathematical Utility Function
 ----------------------------------------------------------------------
-local function Round(value, decimal)
+local function round(value, decimal)
   local exponent = 10^(decimal or 0)
   return math.floor(value * exponent + 0.5) / exponent
 end
@@ -23,7 +23,7 @@ end
 ----------------------------------------------------------------------
 -- Wrapper
 ----------------------------------------------------------------------
-local function ShowValue(x, y, key, font)
+local function showValue(x, y, key, font)
   local value = getValue(key)
 
   if value ~= nil then
@@ -32,14 +32,14 @@ local function ShowValue(x, y, key, font)
   end
 end
 
-local function ShowNameValue(x, y, name, value, font)
+local function showNameValue(x, y, name, value, font)
   if value ~= nil then
     lcd.drawText(x, y, name .. ": ", font)
     lcd.drawText(lcd.getLastPos(), y, value, font)
   end
 end
 
-local function ShowTimer(x, y, key, font)
+local function showTimer(x, y, key, font)
   local value = getValue(key)
 
   if value ~= nil then
@@ -48,14 +48,14 @@ local function ShowTimer(x, y, key, font)
   end
 end
 
-local function ShowNameTimer(x, y, name, value, font)
+local function showNameTimer(x, y, name, value, font)
   if value ~= nil then
     lcd.drawText(x, y, name .. ": ", font)
     lcd.drawTimer(lcd.getLastPos(), y, value, font)
   end
 end
 
-local function ShowGauge(x, y, w, h, key)
+local function showGauge(x, y, w, h, key)
   local value = getValue(key.key)
 
   if value ~= nil then
@@ -78,14 +78,14 @@ end
 -- Classes
 ----------------------------------------------------------------------
 -- Gauge
-local gauge = {}
-  gauge["key"] = "key"
-  gauge["min"] = 1
-  gauge["max"] = 100
-  gauge["factor"] = 1
-  gauge["smooth"] = 1
+local Gauge = {}
+  Gauge["key"] = "key"
+  Gauge["min"] = 1
+  Gauge["max"] = 100
+  Gauge["factor"] = 1
+  Gauge["smooth"] = 1
 
-function gauge:New(o)
+function Gauge:new(o)
   o = o or {}
   setmetatable(o, self)
   self.__index = self
@@ -93,21 +93,21 @@ function gauge:New(o)
 end
 
 -- Diagram
-local diagram = {}
-  diagram["key"] = "key"
-  diagram["length"] = 102
-  diagram["time"] = 0
-  diagram["delta"] = 1
-  diagram["extreme"] = 500
+local Diagram = {}
+  Diagram["key"] = "key"
+  Diagram["length"] = 102
+  Diagram["time"] = 0
+  Diagram["delta"] = 1
+  Diagram["extreme"] = 500
 
-function diagram:New(o)
+function Diagram:new(o)
   o = o or {}
   setmetatable(o, self)
   self.__index = self
   return o
 end
 
-function diagram:Add()
+function Diagram:add()
   local value = getValue(self.key)
   local diff = 0
 
@@ -132,7 +132,7 @@ function diagram:Add()
   end
 end
 
-function diagram:MinMax()
+function Diagram:getMinMax()
   local maxValue = self[1]
   local minValue = self[1]
 
@@ -147,11 +147,11 @@ function diagram:MinMax()
   return minValue, maxValue
 end
 
-function diagram:Show(x, y, h)
-  local min, max = self:MinMax()
+function Diagram:show(x, y, h)
+  local min, max = self:getMinMax()
   local diff = 0
 
-  lcd.drawText(x + 3, y, self.key .. " " .. Round(self[1], 2) .. "/" .. Round(max, 2) .. "/" .. Round(min, 2), SMLSIZE)
+  lcd.drawText(x + 3, y, self.key .. " " .. round(self[1], 2) .. "/" .. round(max, 2) .. "/" .. round(min, 2), SMLSIZE)
 
   if min > 0 then
     min = 0
@@ -184,17 +184,17 @@ function diagram:Show(x, y, h)
 end
 
 -- Switch
-local switch = {}
-  switch["key"] = "key"
+local Switch = {}
+  Switch["key"] = "key"
 
-function switch:New(o)
+function Switch:new(o)
   o = o or {}
   setmetatable(o, self)
   self.__index = self
   return o
 end
 
-function switch:GetName()
+function Switch:getName()
   local value = getValue(self.key)
 
   if value ~= nil then
@@ -206,28 +206,28 @@ function switch:GetName()
   end
 end
 
-function switch:Show(x, y, font)
-  local value = self:GetName()
+function Switch:show(x, y, font)
+  local value = self:getName()
 
   if value ~= nil then
     lcd.drawText(x, y, value, font)
   end
 end
 
--- LiPo
-local lipo = {}
-  lipo["key"] = "key"
-  lipo["min"] = 3.3
-  lipo["max"] = 4.3
+-- Lipo
+local Lipo = {}
+  Lipo["key"] = "key"
+  Lipo["min"] = 3.3
+  Lipo["max"] = 4.3
 
-function lipo:New(o)
+function Lipo:new(o)
   o = o or {}
   setmetatable(o, self)
   self.__index = self
   return o
 end
 
-function lipo:Check()
+function Lipo:check()
   local value = getValue(self.key)
 
   if value ~= nil then
@@ -250,7 +250,7 @@ function lipo:Check()
   end
 end
 
-function lipo:GetCels(key)
+function Lipo:getCels(key)
   local value = ""
 
   if getValue(key) ~=0 and getValue(self.key) ~= 0  then
@@ -260,29 +260,23 @@ function lipo:GetCels(key)
   return value
 end
 
--- correction
-local correction = {}
-   correction["key"] = "key"
-   correction["factor"] = 0
+-- Correction
+local Correction = {}
+   Correction["key"] = "key"
+   Correction["factor"] = 0
 
-function correction:New(o)
+function Correction:new(o)
   o = o or {}
   setmetatable(o, self)
   self.__index = self
   return o
 end
 
-function correction:Show(x, y, font)
-  local value = getValue(self.key)
-
-  if value ~= nil then
-    lcd.drawText(x, y, self.key .. ": ", font)
-    lcd.drawNumber(lcd.getLastPos(), y, (value - self.factor) * 100, font+PREC2+LEFT)
-    lcd.drawText(lcd.getLastPos(), y, " aligned", font)
-  end
+function Correction:getAligned()
+  return getValue(self.key) - self.factor
 end
 
-function correction:Reset()
+function Correction:reset()
   local value = getValue(self.key)
 
   if value ~= nil then
@@ -290,43 +284,43 @@ function correction:Reset()
   end
 end
 
--- raceTimer
-local raceTimer = {}
-  raceTimer["triggerKey"] = "sh"
-  raceTimer["armedKey"] = "ch13"
-  raceTimer["throttleKey"] = "thr"
-  raceTimer["triggerKey"] = "sh"
-  raceTimer["flag"] = true
-  raceTimer["timerIndex"] = 2
-  raceTimer["timerName"] = "timer3"
-  raceTimer["lapTime"] = {}
+-- RaceTimer
+local RaceTimer = {}
+  RaceTimer["triggerKey"] = "sh"
+  RaceTimer["armedKey"] = "ch13"
+  RaceTimer["throttleKey"] = "thr"
+  RaceTimer["triggerKey"] = "sh"
+  RaceTimer["flag"] = true
+  RaceTimer["timerIndex"] = 2
+  RaceTimer["timerName"] = "timer3"
+  RaceTimer["lapTime"] = {}
 
-function raceTimer:New(o)
+function RaceTimer:new(o)
   o = o or {}
   setmetatable(o, self)
   self.__index = self
   return o
 end
 
-function raceTimer:GetName()
+function RaceTimer:getName()
   return self.timerName
 end
 
-function raceTimer:Start()
+function RaceTimer:start()
   local timer = model.getTimer(self.timerIndex)
 
   timer.mode = 1
   model.setTimer(self.timerIndex, timer)
 end
 
-function raceTimer:Stop()
+function RaceTimer:stop()
   local timer = model.getTimer(self.timerIndex)
 
   timer.mode = 0
   model.setTimer(self.timerIndex, timer)
 end
 
-function raceTimer:Reset()
+function RaceTimer:reset()
   model.resetTimer(self.timerIndex)
   for index, data in ipairs(self) do
     self[index] = nil
@@ -338,12 +332,13 @@ function raceTimer:Reset()
   self.worst = nil
 end
 
-function raceTimer:Add()
+function RaceTimer:add()
   self[#self+1] = model.getTimer(self.timerIndex).value
   if #self == 1 then
     self.lapTime[#self.lapTime + 1] = self[#self]
     self.best = self[#self]
     self.worst = self[#self]
+    self.average = self[#self]
   elseif #self > 1 then
     self.lapTime[#self.lapTime + 1] = self[#self] - self[#self - 1]
     if self.lapTime[#self.lapTime] > self.worst then
@@ -352,55 +347,66 @@ function raceTimer:Add()
     if self.lapTime[#self.lapTime] < self.best then
       self.best = self.lapTime[#self.lapTime]
     end
+    self.average = 0
+    for index, data in ipairs(self.lapTime) do
+      self.average = self.average + data
+    end
+    self.average = round(self.average / #self.lapTime, 0)
   end
 end
 
-function raceTimer:GetBestTime()
+function RaceTimer:getBestTime()
   return self.best
 end
 
-function raceTimer:GetWorstTime()
+function RaceTimer:getWorstTime()
   return self.worst
 end
 
-function raceTimer:GetLastTime()
+function RaceTimer:getLastTime()
   return self.lapTime[#self.lapTime]
 end
 
-function raceTimer:GetTime(lap)
+function RaceTimer:getAverageTime()
+  return self.average
+end
+
+function RaceTimer:getLapTime(lap)
   return self.lapTime[lap]
 end
 
-function raceTimer:GetTotal()
+function RaceTimer:getTotalTime()
   return model.getTimer(self.timerIndex).value
 end
 
-function raceTimer:GetLap()
+function RaceTimer:getCurrentLap()
   return #self.lapTime + 1
 end
 
-function raceTimer:Summary()
+function RaceTimer:printSummary()
   for index, data in ipairs(self.lapTime) do
     print(index .. ") " .. data)
   end
 end
 
-function raceTimer:Check()
-  local switch = getValue(self.triggerKey)
+function RaceTimer:check()
+  local Switch = getValue(self.triggerKey)
   local armed = getValue(self.armedKey)
   local throttle = getValue(self.throttleKey)
   local trigger = getValue(self.triggerKey)
 
   if (armed == 1024 and throttle > -1024 and model.getTimer(self.timerIndex).mode == 0) then
-    self:Reset()
-    self:Start()
+    self:reset()
+    self:start()
+    playNumber(1, 0)
   end
   if (armed == -1024 and model.getTimer(self.timerIndex).mode == 1) then
-    self:Stop()
-    -- self:Summary()
+    self:stop()
+    -- self:printSummary()
   end
   if (armed == 1024 and trigger == 1024 and model.getTimer(self.timerIndex).mode == 1 and self.flag == true) then
-    self:Add()
+    self:add()
+    playNumber(#self.lapTime + 1, 0)
     self.flag = false
   end
   if (self.flag == false and trigger == -1024) then
@@ -411,34 +417,34 @@ end
 ----------------------------------------------------------------------
 -- local definitions
 ----------------------------------------------------------------------
-local energy = lipo:New{ key = "A4",
+local energy = Lipo:new{ key = "A4",
   { limit = 3.3, delta = 10, file = "lowbat.wav" },
   { limit = 3.5, delta = 10, file = "lowbat.wav" }
 }
-local rssiGauge = gauge:New{ key = "RSSI", min = 40, max = 100 }
-local energyGauge = gauge:New{ key = "A4", min = energy.min, max =  energy.max, smooth = 100 }
-local altDiagram = diagram:New{ key = "Alt", delta = 1, extreme = 100 }
-local ch6 = switch:New{ key = "ch6",
+local rssiGauge = Gauge:new{ key = "RSSI", min = 40, max = 100 }
+local energyGauge = Gauge:new{ key = "A4", min = energy.min, max =  energy.max, smooth = 100 }
+local altDiagram = Diagram:new{ key = "Alt", delta = 1, extreme = 100 }
+local ch6 = Switch:new{ key = "ch6",
   { position = -1024, },
   { position = 0, name = "baro" },
   { position = 1024 }
 }
-local ch7 = switch:New{ key = "ch7",
+local ch7 = Switch:new{ key = "ch7",
   { position = -1024 },
   { position = 0, name = "osd sw" },
   { position = 1024, name = "air mode" }
 }
-local ch8 = switch:New{ key = "ch8",
+local ch8 = Switch:new{ key = "ch8",
   { position = -1024 },
   { position = 0, name = "beeper" },
   { position = 1024 },
 }
-local ch13 = switch:New{ key = "ch13",
+local ch13 = Switch:new{ key = "ch13",
   { position = 1024, name = "armed" },
   { position = -1024 }
 }
-local heading = correction:New{ key = "Hdg" }
-local race = raceTimer:New{}
+local heading = Correction:new{ key = "Hdg" }
+local race = RaceTimer:new{}
 
 ----------------------------------------------------------------------
 -- display
@@ -447,11 +453,11 @@ local display = {}
   display["width"] = 212
   display["height"] = 64
 
-function display:Show(screen)
+function display:show(screen)
   local flightMode = ( { getFlightMode() } )[2]
   local modelName = model.getInfo().name
 
-  lcd.drawScreenTitle(modelName .. "  (" .. energy:GetCels("VFAS") .. "S)  " .. flightMode .. " - " .. version, screen.num, #screen)
+  lcd.drawScreenTitle(modelName .. "  (" .. energy:getCels("VFAS") .. "S)  " .. flightMode .. " - " .. version, screen.num, #screen)
   screen[screen.num]()
 end
 
@@ -476,47 +482,49 @@ function screen:Previous()
 end
 
 screen[1] = function()
-  ShowValue(1, 9, "VFAS", MIDSIZE)
-  ShowGauge(107, 9, 100, 12, energyGauge)
-  ShowValue(1, 25, "RSSI", MIDSIZE)
-  ShowGauge(107, 25, 100, 12, rssiGauge)
-  ShowValue(107, 41, "Hdg", SMLSIZE)
-  heading:Show(107, 49, SMLSIZE)
-  ch13:Show(1, 41, MIDSIZE+INVERS+BLINK)
-  ch6:Show(1, 57, SMLSIZE)
-  ch7:Show(1 + display["width"] * 1 / 5, 57, SMLSIZE)
-  ch8:Show(1 + display["width"] * 2 / 5, 57, SMLSIZE)
-  ShowNameTimer(1 + display["width"] * 3 / 5, 57, "total", race:GetTotal(), SMLSIZE)
+  showValue(1, 9, "VFAS", MIDSIZE)
+  showGauge(107, 9, 100, 12, energyGauge)
+  showValue(1, 25, "RSSI", MIDSIZE)
+  showGauge(107, 25, 100, 12, rssiGauge)
+  showValue(107, 41, "Hdg", SMLSIZE)
+  -- heading:show(107, 49, SMLSIZE)
+  showNameValue(107, 49, "aligned", heading:getAligned(), SMLSIZE)
+  ch13:show(1, 41, MIDSIZE+INVERS+BLINK)
+  ch6:show(1, 57, SMLSIZE)
+  ch7:show(1 + display["width"] * 1 / 5, 57, SMLSIZE)
+  ch8:show(1 + display["width"] * 2 / 5, 57, SMLSIZE)
+  showNameTimer(1 + display["width"] * 3 / 5, 57, "total", race:getTotalTime(), SMLSIZE)
 end
 
 screen[2] = function()
-  ShowValue(1, 9, "Alt", MIDSIZE)
-  altDiagram:Show(107, 9, 38)
-  ch13:Show(1, 41, MIDSIZE+INVERS+BLINK)
-  ch6:Show(1, 57, SMLSIZE)
-  ch7:Show(1 + display["width"] * 1 / 5, 57, SMLSIZE)
-  ch8:Show(1 + display["width"] * 2 / 5, 57, SMLSIZE)
-  ShowNameTimer(1 + display["width"] * 3 / 5, 57, "total", race:GetTotal(), SMLSIZE)
+  showValue(1, 9, "Alt", MIDSIZE)
+  altDiagram:show(107, 9, 38)
+  ch13:show(1, 41, MIDSIZE+INVERS+BLINK)
+  ch6:show(1, 57, SMLSIZE)
+  ch7:show(1 + display["width"] * 1 / 5, 57, SMLSIZE)
+  ch8:show(1 + display["width"] * 2 / 5, 57, SMLSIZE)
+  showNameTimer(1 + display["width"] * 3 / 5, 57, "total", race:getTotalTime(), SMLSIZE)
 end
 
 screen[3] = function()
-  ShowNameTimer(1, 9, "tot", race:GetTotal(), MIDSIZE)
-  ShowNameValue(1 + display["width"] * 1 / 3, 9, "lap", race:GetLap(), MIDSIZE)
-  ShowNameTimer(1, 25, "last", race:GetLastTime(), SMLSIZE)
-  ShowNameTimer(1, 34, "best", race:GetBestTime(), SMLSIZE)
-  ShowNameTimer(1, 43, "worst", race:GetWorstTime(), SMLSIZE)
-  ShowNameTimer(1 + display["width"] * 3 / 5, 9, "1", race:GetTime(1), SMLSIZE)
-  ShowNameTimer(1 + display["width"] * 3 / 5, 18, "2", race:GetTime(2), SMLSIZE)
-  ShowNameTimer(1 + display["width"] * 3 / 5, 27, "3", race:GetTime(3), SMLSIZE)
-  ShowNameTimer(1 + display["width"] * 3 / 5, 36, "4", race:GetTime(4), SMLSIZE)
-  ShowNameTimer(1 + display["width"] * 3 / 5, 45, "5", race:GetTime(5), SMLSIZE)
-  ShowNameTimer(1 + display["width"] * 3 / 5, 54, "6", race:GetTime(6), SMLSIZE)
-  ShowNameTimer(1 + display["width"] * 4 / 5, 9, "7", race:GetTime(7), SMLSIZE)
-  ShowNameTimer(1 + display["width"] * 4 / 5, 18, "8", race:GetTime(8), SMLSIZE)
-  ShowNameTimer(1 + display["width"] * 4 / 5, 27, "9", race:GetTime(9), SMLSIZE)
-  ShowNameTimer(1 + display["width"] * 4 / 5, 36, "10", race:GetTime(10), SMLSIZE)
-  ShowNameTimer(1 + display["width"] * 4 / 5, 45, "11", race:GetTime(11), SMLSIZE)
-  ShowNameTimer(1 + display["width"] * 4 / 5, 54, "12", race:GetTime(12), SMLSIZE)
+  showNameTimer(1, 9, "tot", race:getTotalTime(), MIDSIZE)
+  showNameValue(1 + display["width"] * 1 / 3, 9, "lap", race:getCurrentLap(), MIDSIZE)
+  showNameTimer(1, 25, "last", race:getLastTime(), SMLSIZE)
+  showNameTimer(1, 34, "best", race:getBestTime(), SMLSIZE)
+  showNameTimer(1, 43, "worst", race:getWorstTime(), SMLSIZE)
+  showNameTimer(1, 52, "average", race:getAverageTime(), SMLSIZE)
+  showNameTimer(1 + display["width"] * 3 / 5, 9, "1", race:getLapTime(1), SMLSIZE)
+  showNameTimer(1 + display["width"] * 3 / 5, 18, "2", race:getLapTime(2), SMLSIZE)
+  showNameTimer(1 + display["width"] * 3 / 5, 27, "3", race:getLapTime(3), SMLSIZE)
+  showNameTimer(1 + display["width"] * 3 / 5, 36, "4", race:getLapTime(4), SMLSIZE)
+  showNameTimer(1 + display["width"] * 3 / 5, 45, "5", race:getLapTime(5), SMLSIZE)
+  showNameTimer(1 + display["width"] * 3 / 5, 54, "6", race:getLapTime(6), SMLSIZE)
+  showNameTimer(1 + display["width"] * 4 / 5, 9, "7", race:getLapTime(7), SMLSIZE)
+  showNameTimer(1 + display["width"] * 4 / 5, 18, "8", race:getLapTime(8), SMLSIZE)
+  showNameTimer(1 + display["width"] * 4 / 5, 27, "9", race:getLapTime(9), SMLSIZE)
+  showNameTimer(1 + display["width"] * 4 / 5, 36, "10", race:getLapTime(10), SMLSIZE)
+  showNameTimer(1 + display["width"] * 4 / 5, 45, "11", race:getLapTime(11), SMLSIZE)
+  showNameTimer(1 + display["width"] * 4 / 5, 54, "12", race:getLapTime(12), SMLSIZE)
 end
 
 ----------------------------------------------------------------------
@@ -526,9 +534,9 @@ end
 
 local function bg_func()
   -- bg_func is called periodically when screen is not visible
-  altDiagram:Add()
-  energy:Check()
-  raceTimer:Check()
+  altDiagram:add()
+  energy:check()
+  race:check()
 end
 
 local function run_func(event)
@@ -546,10 +554,10 @@ local function run_func(event)
   end
 
   if event == EVT_ENTER_BREAK then
-    heading:Reset()
+    heading:reset()
   end
 
-  display:Show(screen)
+  display:show(screen)
 end
 
 return { run=run_func, background=bg_func, init=init_func  }
