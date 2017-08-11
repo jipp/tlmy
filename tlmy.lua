@@ -10,7 +10,7 @@
 ----------------------------------------------------------------------
 -- Version String
 ----------------------------------------------------------------------
-local version = "v0.15.1"
+local version = "v0.16.0"
 
 ----------------------------------------------------------------------
 -- Mathematical Utility Function
@@ -32,11 +32,25 @@ local function ShowValue(x, y, key, font)
   end
 end
 
+local function ShowNameValue(x, y, name, value, font)
+  if value ~= nil then
+    lcd.drawText(x, y, name .. ": ", font)
+    lcd.drawText(lcd.getLastPos(), y, value, font)
+  end
+end
+
 local function ShowTimer(x, y, key, font)
   local value = getValue(key)
 
   if value ~= nil then
     lcd.drawText(x, y, key .. ": ", font)
+    lcd.drawTimer(lcd.getLastPos(), y, value, font)
+  end
+end
+
+local function ShowNameTimer(x, y, name, value, font)
+  if value ~= nil then
+    lcd.drawText(x, y, name .. ": ", font)
     lcd.drawTimer(lcd.getLastPos(), y, value, font)
   end
 end
@@ -276,6 +290,124 @@ function correction:Reset()
   end
 end
 
+-- raceTimer
+local raceTimer = {}
+  raceTimer["triggerKey"] = "sh"
+  raceTimer["armedKey"] = "ch13"
+  raceTimer["throttleKey"] = "thr"
+  raceTimer["triggerKey"] = "sh"
+  raceTimer["flag"] = true
+  raceTimer["timerIndex"] = 2
+  raceTimer["timerName"] = "timer3"
+  raceTimer["lapTime"] = {}
+
+function raceTimer:New(o)
+  o = o or {}
+  setmetatable(o, self)
+  self.__index = self
+  return o
+end
+
+function raceTimer:GetName()
+  return self.timerName
+end
+
+function raceTimer:Start()
+  local timer = model.getTimer(self.timerIndex)
+
+  timer.mode = 1
+  model.setTimer(self.timerIndex, timer)
+end
+
+function raceTimer:Stop()
+  local timer = model.getTimer(self.timerIndex)
+
+  timer.mode = 0
+  model.setTimer(self.timerIndex, timer)
+end
+
+function raceTimer:Reset()
+  model.resetTimer(self.timerIndex)
+  for index, data in ipairs(self) do
+    self[index] = nil
+  end
+  for index, data in ipairs(self.lapTime) do
+    self.lapTime[index] = nil
+  end
+  self.best = nil
+  self.worst = nil
+end
+
+function raceTimer:Add()
+  self[#self+1] = model.getTimer(self.timerIndex).value
+  if #self == 1 then
+    self.lapTime[#self.lapTime + 1] = self[#self]
+    self.best = self[#self]
+    self.worst = self[#self]
+  elseif #self > 1 then
+    self.lapTime[#self.lapTime + 1] = self[#self] - self[#self - 1]
+    if self.lapTime[#self.lapTime] > self.worst then
+      self.worst = self.lapTime[#self.lapTime]
+    end
+    if self.lapTime[#self.lapTime] < self.best then
+      self.best = self.lapTime[#self.lapTime]
+    end
+  end
+end
+
+function raceTimer:GetBestTime()
+  return self.best
+end
+
+function raceTimer:GetWorstTime()
+  return self.worst
+end
+
+function raceTimer:GetLastTime()
+  return self.lapTime[#self.lapTime]
+end
+
+function raceTimer:GetTime(lap)
+  return self.lapTime[lap]
+end
+
+function raceTimer:GetTotal()
+  return model.getTimer(self.timerIndex).value
+end
+
+function raceTimer:GetLap()
+  return #self.lapTime + 1
+end
+
+function raceTimer:Summary()
+  for index, data in ipairs(self.lapTime) do
+    print(index .. ") " .. data)
+  end
+end
+
+function raceTimer:Check()
+  local switch = getValue(self.triggerKey)
+  local armed = getValue(self.armedKey)
+  local throttle = getValue(self.throttleKey)
+  local trigger = getValue(self.triggerKey)
+
+  if (armed == 1024 and throttle > -1024 and model.getTimer(self.timerIndex).mode == 0) then
+    self:Reset()
+    self:Start()
+  end
+  if (armed == -1024 and model.getTimer(self.timerIndex).mode == 1) then
+    self:Stop()
+    -- self:Summary()
+  end
+  if (armed == 1024 and trigger == 1024 and model.getTimer(self.timerIndex).mode == 1 and self.flag == true) then
+    self:Add()
+    self.flag = false
+  end
+  if (self.flag == false and trigger == -1024) then
+    self.flag = true
+  end
+end
+
 ----------------------------------------------------------------------
 -- local definitions
 ----------------------------------------------------------------------
@@ -306,6 +438,7 @@ local ch13 = switch:New{ key = "ch13",
   { position = -1024 }
 }
 local heading = correction:New{ key = "Hdg" }
+local race = raceTimer:New{}
 
 ----------------------------------------------------------------------
 -- display
@@ -350,20 +483,40 @@ screen[1] = function()
   ShowValue(107, 41, "Hdg", SMLSIZE)
   heading:Show(107, 49, SMLSIZE)
   ch13:Show(1, 41, MIDSIZE+INVERS+BLINK)
-  ch6:Show(1, 56, SMLSIZE)
-  ch7:Show(1 + display["width"] * 1 / 5, 56, SMLSIZE)
-  ch8:Show(1 + display["width"] * 2 / 5, 56, SMLSIZE)
-  ShowTimer(1 + display["width"] * 3 / 5, 56, "timer1", SMLSIZE)
+  ch6:Show(1, 57, SMLSIZE)
+  ch7:Show(1 + display["width"] * 1 / 5, 57, SMLSIZE)
+  ch8:Show(1 + display["width"] * 2 / 5, 57, SMLSIZE)
+  ShowNameTimer(1 + display["width"] * 3 / 5, 57, "total", race:GetTotal(), SMLSIZE)
 end
 
 screen[2] = function()
   ShowValue(1, 9, "Alt", MIDSIZE)
   altDiagram:Show(107, 9, 38)
   ch13:Show(1, 41, MIDSIZE+INVERS+BLINK)
-  ch6:Show(1, 56, SMLSIZE)
-  ch7:Show(1 + display["width"] * 1 / 5, 56, SMLSIZE)
-  ch8:Show(1 + display["width"] * 2 / 5, 56, SMLSIZE)
-  ShowTimer(1 + display["width"] * 3 / 5, 56, "timer1", SMLSIZE)
+  ch6:Show(1, 57, SMLSIZE)
+  ch7:Show(1 + display["width"] * 1 / 5, 57, SMLSIZE)
+  ch8:Show(1 + display["width"] * 2 / 5, 57, SMLSIZE)
+  ShowNameTimer(1 + display["width"] * 3 / 5, 57, "total", race:GetTotal(), SMLSIZE)
+end
+
+screen[3] = function()
+  ShowNameTimer(1, 9, "tot", race:GetTotal(), MIDSIZE)
+  ShowNameValue(1 + display["width"] * 1 / 3, 9, "lap", race:GetLap(), MIDSIZE)
+  ShowNameTimer(1, 25, "last", race:GetLastTime(), SMLSIZE)
+  ShowNameTimer(1, 34, "best", race:GetBestTime(), SMLSIZE)
+  ShowNameTimer(1, 43, "worst", race:GetWorstTime(), SMLSIZE)
+  ShowNameTimer(1 + display["width"] * 3 / 5, 9, "1", race:GetTime(1), SMLSIZE)
+  ShowNameTimer(1 + display["width"] * 3 / 5, 18, "2", race:GetTime(2), SMLSIZE)
+  ShowNameTimer(1 + display["width"] * 3 / 5, 27, "3", race:GetTime(3), SMLSIZE)
+  ShowNameTimer(1 + display["width"] * 3 / 5, 36, "4", race:GetTime(4), SMLSIZE)
+  ShowNameTimer(1 + display["width"] * 3 / 5, 45, "5", race:GetTime(5), SMLSIZE)
+  ShowNameTimer(1 + display["width"] * 3 / 5, 54, "6", race:GetTime(6), SMLSIZE)
+  ShowNameTimer(1 + display["width"] * 4 / 5, 9, "7", race:GetTime(7), SMLSIZE)
+  ShowNameTimer(1 + display["width"] * 4 / 5, 18, "8", race:GetTime(8), SMLSIZE)
+  ShowNameTimer(1 + display["width"] * 4 / 5, 27, "9", race:GetTime(9), SMLSIZE)
+  ShowNameTimer(1 + display["width"] * 4 / 5, 36, "10", race:GetTime(10), SMLSIZE)
+  ShowNameTimer(1 + display["width"] * 4 / 5, 45, "11", race:GetTime(11), SMLSIZE)
+  ShowNameTimer(1 + display["width"] * 4 / 5, 54, "12", race:GetTime(12), SMLSIZE)
 end
 
 ----------------------------------------------------------------------
@@ -375,6 +528,7 @@ local function bg_func()
   -- bg_func is called periodically when screen is not visible
   altDiagram:Add()
   energy:Check()
+  raceTimer:Check()
 end
 
 local function run_func(event)
