@@ -23,7 +23,7 @@ end
 ----------------------------------------------------------------------
 -- Wrapper
 ----------------------------------------------------------------------
-local function showValue(x, y, key, font)
+local function showChannel(x, y, key, font)
   local value = getValue(key)
 
   if value ~= nil then
@@ -32,10 +32,10 @@ local function showValue(x, y, key, font)
   end
 end
 
-local function showNameValue(x, y, name, value, font)
+local function showNameNumber(x, y, name, value, font)
   if value ~= nil then
     lcd.drawText(x, y, name .. ": ", font)
-    lcd.drawText(lcd.getLastPos(), y, value, font)
+    lcd.drawNumber(lcd.getLastPos(), y, value, font)
   end
 end
 
@@ -217,8 +217,8 @@ end
 -- Lipo
 local Lipo = {}
   Lipo["key"] = "key"
-  Lipo["min"] = 3.3
-  Lipo["max"] = 4.3
+  Lipo["min"] = 1
+  Lipo["max"] = 2
 
 function Lipo:new(o)
   o = o or {}
@@ -260,6 +260,38 @@ function Lipo:getCels(key)
   return value
 end
 
+-- Altitude
+local Altitude = {}
+  Altitude["key"] = "key"
+  Altitude["unit"] = 9
+  Altitude["min"] = 1
+  Altitude["max"] = 2
+
+function Altitude:new(o)
+  o = o or {}
+  setmetatable(o, self)
+  self.__index = self
+  return o
+end
+
+function Altitude:check()
+  local value = getValue(self.key)
+
+  if value ~= nil then
+    for index, data in ipairs(self) do
+      if data.time == nil then
+        data.time = 0
+      end
+      if value >= data.limit then
+        if getTime() - data.time > data.delta * 100 then
+          data.time = getTime()
+          playNumber(value, self.unit)
+        end
+      end
+    end
+  end
+end
+
 -- Correction
 local Correction = {}
    Correction["key"] = "key"
@@ -281,6 +313,16 @@ function Correction:reset()
 
   if value ~= nil then
     self.factor = value
+  end
+end
+
+function Correction:show(x, y, font)
+  value = self:getAligned()
+
+  if value ~= nil then
+    lcd.drawText(x, y, self.key .. ": ", font)
+    lcd.drawNumber(lcd.getLastPos(), y, value * 100, font + PREC2)
+    lcd.drawText(lcd.getLastPos(), y, " aligned", font)
   end
 end
 
@@ -421,6 +463,9 @@ local energy = Lipo:new{ key = "A4",
   { limit = 3.3, delta = 10, file = "lowbat.wav" },
   { limit = 3.5, delta = 10, file = "lowbat.wav" }
 }
+local alt = Altitude:new{ key= "Alt", unit = 9,
+  { limit = 90, delta = 10 }
+}
 local rssiGauge = Gauge:new{ key = "RSSI", min = 40, max = 100 }
 local energyGauge = Gauge:new{ key = "A4", min = energy.min, max =  energy.max, smooth = 100 }
 local altDiagram = Diagram:new{ key = "Alt", delta = 1, extreme = 100 }
@@ -462,7 +507,7 @@ function display:show(screen)
 end
 
 ----------------------------------------------------------------------
--- define different screens, to add screens increment number in [], do NOT leave a number out
+-- define different screens, to add screens increment number in [], do NOT leave out a number
 ----------------------------------------------------------------------
 local screen = {}
   screen["num"] = 1
@@ -482,13 +527,12 @@ function screen:Previous()
 end
 
 screen[1] = function()
-  showValue(1, 9, "VFAS", MIDSIZE)
+  showChannel(1, 9, "VFAS", MIDSIZE)
   showGauge(107, 9, 100, 12, energyGauge)
-  showValue(1, 25, "RSSI", MIDSIZE)
+  showChannel(1, 25, "RSSI", MIDSIZE)
   showGauge(107, 25, 100, 12, rssiGauge)
-  showValue(107, 41, "Hdg", SMLSIZE)
-  -- heading:show(107, 49, SMLSIZE)
-  showNameValue(107, 49, "aligned", heading:getAligned(), SMLSIZE)
+  showChannel(107, 41, "Hdg", SMLSIZE)
+  heading:show(107, 49, SMLSIZE)
   ch13:show(1, 41, MIDSIZE+INVERS+BLINK)
   ch6:show(1, 57, SMLSIZE)
   ch7:show(1 + display["width"] * 1 / 5, 57, SMLSIZE)
@@ -497,7 +541,7 @@ screen[1] = function()
 end
 
 screen[2] = function()
-  showValue(1, 9, "Alt", MIDSIZE)
+  showChannel(1, 9, "Alt", MIDSIZE)
   altDiagram:show(107, 9, 38)
   ch13:show(1, 41, MIDSIZE+INVERS+BLINK)
   ch6:show(1, 57, SMLSIZE)
@@ -507,8 +551,8 @@ screen[2] = function()
 end
 
 screen[3] = function()
-  showNameTimer(1, 9, "tot", race:getTotalTime(), MIDSIZE)
-  showNameValue(1 + display["width"] * 1 / 3, 9, "lap", race:getCurrentLap(), MIDSIZE)
+  showNameTimer(1, 9, "t", race:getTotalTime(), MIDSIZE)
+  showNameNumber(1 + display["width"] * 1 / 3, 9, "#", race:getCurrentLap(), MIDSIZE)
   showNameTimer(1, 25, "last", race:getLastTime(), SMLSIZE)
   showNameTimer(1, 34, "best", race:getBestTime(), SMLSIZE)
   showNameTimer(1, 43, "worst", race:getWorstTime(), SMLSIZE)
@@ -535,6 +579,7 @@ end
 local function bg_func()
   -- bg_func is called periodically when screen is not visible
   altDiagram:add()
+  alt:check()
   energy:check()
   race:check()
 end
