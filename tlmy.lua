@@ -10,7 +10,7 @@
 ----------------------------------------------------------------------
 -- Version String
 ----------------------------------------------------------------------
-local version = "v0.16.0"
+local version = "v0.16.1"
 
 ----------------------------------------------------------------------
 -- Mathematical Utility Function
@@ -329,7 +329,7 @@ end
 -- RaceTimer
 local RaceTimer = {}
   RaceTimer["triggerKey"] = "sh"
-  RaceTimer["armedKey"] = "ch13"
+  RaceTimer["armedKey"] = "ch7"
   RaceTimer["throttleKey"] = "thr"
   RaceTimer["triggerKey"] = "sh"
   RaceTimer["flag"] = true
@@ -470,21 +470,11 @@ local rssiGauge = Gauge:new{ key = "RSSI", min = 40, max = 100 }
 local energyGauge = Gauge:new{ key = "A4", min = energy.min, max =  energy.max, smooth = 100 }
 local altDiagram = Diagram:new{ key = "Alt", delta = 1, extreme = 100 }
 local ch6 = Switch:new{ key = "ch6",
-  { position = -1024, },
-  { position = 0, name = "baro" },
-  { position = 1024 }
-}
-local ch7 = Switch:new{ key = "ch7",
-  { position = -1024 },
-  { position = 0, name = "osd sw" },
-  { position = 1024, name = "air mode" }
-}
-local ch8 = Switch:new{ key = "ch8",
   { position = -1024 },
   { position = 0, name = "beeper" },
   { position = 1024 },
 }
-local ch13 = Switch:new{ key = "ch13",
+local ch7 = Switch:new{ key = "ch7",
   { position = 1024, name = "armed" },
   { position = -1024 }
 }
@@ -533,20 +523,16 @@ screen[1] = function()
   showGauge(107, 25, 100, 12, rssiGauge)
   showChannel(107, 41, "Hdg", SMLSIZE)
   heading:show(107, 49, SMLSIZE)
-  ch13:show(1, 41, MIDSIZE+INVERS+BLINK)
+  ch7:show(1, 41, MIDSIZE+INVERS+BLINK)
   ch6:show(1, 57, SMLSIZE)
-  ch7:show(1 + display["width"] * 1 / 5, 57, SMLSIZE)
-  ch8:show(1 + display["width"] * 2 / 5, 57, SMLSIZE)
   showNameTimer(1 + display["width"] * 3 / 5, 57, "total", race:getTotalTime(), SMLSIZE)
 end
 
 screen[2] = function()
   showChannel(1, 9, "Alt", MIDSIZE)
   altDiagram:show(107, 9, 38)
-  ch13:show(1, 41, MIDSIZE+INVERS+BLINK)
+  ch7:show(1, 41, MIDSIZE+INVERS+BLINK)
   ch6:show(1, 57, SMLSIZE)
-  ch7:show(1 + display["width"] * 1 / 5, 57, SMLSIZE)
-  ch8:show(1 + display["width"] * 2 / 5, 57, SMLSIZE)
   showNameTimer(1 + display["width"] * 3 / 5, 57, "total", race:getTotalTime(), SMLSIZE)
 end
 
